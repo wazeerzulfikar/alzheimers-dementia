@@ -1,69 +1,92 @@
 import tensorflow as tf
-# import tensorflow.keras as k
-import keras
-from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
-
+from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 
 import numpy as np
 import cv2
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import OneHotEncoder
 
 import glob
 import os
 
 
-def read_and_process_image(list_of_images):
-	"""
-	Returns two arrays:
-		X is an array of images
-		y is an rray of labels
-	"""
-	X = [] # images
-	y = [] # labels
+dataset_dir = '../spectograms/'
+cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
+X_cc = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cc_files])
+y_cc = np.zeros((X_cc.shape[0], 2))
+y_cc[:,0] = 1
 
-	for image in list_of_images:
-		img = cv2.imread(image, cv2.IMREAD_COLOR)
-		X.append(img)
+cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
+X_cd = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cd_files])
+y_cd = np.zeros((X_cd.shape[0], 2))
+y_cd[:,1] = 1
 
-	return img.shape
+X = np.concatenate((X_cc, X_cd), axis=0).astype(np.float32)
+y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 
+p = np.random.permutation(len(X))
+X = X[p]
+y = y[p]
 
-dataset_dir = 'cc-images/'
-cc = sorted(glob.glob(os.path.join(dataset_dir, '*.png')))
-
-dataset_dir = 'cd-images/'
-cd = sorted(glob.glob(os.path.join(dataset_dir, '*.png')))
-
-input_shape = read_and_process_image(cc)
+inp_shape = X_cc[0].shape
 num_classes = 2
 
+def create_model():
+    model = tf.keras.Sequential()
+    model.add(layers.Input(inp_shape))
+    model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+                     activation='relu'))
+    model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+                     activation='relu'))
+    model.add(layers.BatchNormalization())
 
-model = tf.keras.Sequential()
-model.add(Conv2D(32, kernel_size=(5, 5), strides=(1, 1),
-                 activation='relu',
-                 input_shape=input_shape))
-model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-model.add(Conv2D(64, (5, 5), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Flatten())
-model.add(Dense(1000, activation='relu'))
-model.add(Dense(num_classes, activation='softmax'))
+    model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
+                     activation='relu'))
+    model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+                     activation='relu'))
+    model.add(layers.BatchNormalization())
 
+    model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
+                     activation='relu'))
+    model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+                     activation='relu'))
+    model.add(layers.BatchNormalization())
+
+    model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
+                     activation='relu'))
+    model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
+                     activation='relu'))
+    model.add(layers.BatchNormalization())
+
+    model.add(layers.Flatten())
+    model.add(layers.Dense(128, activation='relu'))
+    model.add(layers.Dense(num_classes, activation='softmax'))
+
+    return model
+
+model = create_model()
+print(model.summary())
 # training
-model.compile(loss=keras.losses.categorical_crossentropy,
-              optimizer=keras.optimizers.SGD(lr=0.01),
-              metrics=['accuracy'])
-model.fit(x_train, y_train,
-          batch_size=batch_size,
-          epochs=epochs,
-          verbose=1,
-          validation_data=(x_test, y_test),
-          callbacks=[history])
 
-scores = cross_val_score(model, X, y, cv=5)
-print('SCORES: ', scores)
+n_split = 5
+epochs = 30
+batch_size = 4
 
-# evaluating and printing results
-score = model.evaluate(x_test, y_test, verbose=0)
-print('Test loss:', score[0])
-print('Test accuracy:', score[1])
+for train_index, val_index in KFold(n_split, shuffle=True).split(X):
+
+    x_train, x_val = X[train_index], X[val_index]
+    y_train, y_val = y[train_index], y[val_index]
+    model = create_model()
+
+    model.compile(loss=tf.keras.losses.categorical_crossentropy,
+                  optimizer=tf.keras.optimizers.Adam(),
+                  metrics=['categorical_accuracy'])
+    model.fit(x_train, y_train,
+              batch_size=batch_size,
+              epochs=epochs,
+              verbose=1,
+              validation_data=(x_val, y_val))
+    score = model.evaluate(x_val, y_val, verbose=0)
+    # print('Val accuracy:', score[1])
+    exit()
