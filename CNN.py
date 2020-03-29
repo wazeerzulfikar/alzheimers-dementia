@@ -3,7 +3,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.callbacks import Callback, TensorBoard
 
-import os
+import os, sys
 import glob
 import time
 
@@ -38,48 +38,59 @@ y = y[p]
 inp_shape = X_cc[0].shape
 num_classes = 2
 
-def create_model():
-	model = tf.keras.Sequential()
-	model.add(layers.Input(inp_shape))
-	model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
-					 activation='relu'))
-	model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
-					 activation='relu'))
-	model.add(layers.BatchNormalization())
+def create_model(_type_ = 'convolutional'):
 
-	model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
-					 activation='relu'))
-	model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
-					 activation='relu'))
-	model.add(layers.BatchNormalization())
+	if _type_=='convolutional':
 
-	model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
-					 activation='relu'))
-	model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
-					 activation='relu'))
-	model.add(layers.BatchNormalization())
+		model = tf.keras.Sequential()
+		model.add(layers.Input(inp_shape))
+		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
 
-	model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
-					 activation='relu'))
-	model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
-					 activation='relu'))
-	model.add(layers.BatchNormalization())
+		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
 
-	model.add(layers.Flatten())
-	model.add(layers.Dropout(0.5)) # 0.5
-	model.add(layers.Dense(128, activation='relu'))
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(num_classes, activation='softmax'))
+		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
+
+		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
+
+		model.add(layers.Flatten())
+		model.add(layers.Dropout(0.5)) # 0.5
+		model.add(layers.Dense(128, activation='relu'))
+		model.add(layers.Dropout(0.5))
+		model.add(layers.Dense(num_classes, activation='softmax'))
+
+	if _type_=='recurrent':
+
+		model = tf.keras.Sequential()
+		model.add(layers.Input((X_cc[0].shape[1], X_cc[0].shape[0], X_cc[0].shape[2])))
+		model.add(layers.TimeDistributed(layers.Flatten()))
+		model.add(layers.LSTM(128))
+		model.add(layers.Dense(num_classes, activation='softmax'))
+		global X
+		X = X.reshape(X.shape[0], X.shape[2], X.shape[1], X.shape[3])
 
 	return model
 
-model = create_model()
+model = create_model(_type_='recurrent')
 print(model.summary())
+print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
-# timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-# log_name = "{}".format(timeString)
 
-# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
 # training
 
 n_split = 5
@@ -90,7 +101,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 
 	x_train, x_val = X[train_index], X[val_index]
 	y_train, y_val = y[train_index], y[val_index]
-	model = create_model()
+	model = create_model(_type_='recurrent')
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
@@ -108,4 +119,4 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  validation_data=(x_val, y_val))
 	score = model.evaluate(x_val, y_val, verbose=0)
 	print('Val accuracy:', score[1])
-	# exit()
+	exit()
