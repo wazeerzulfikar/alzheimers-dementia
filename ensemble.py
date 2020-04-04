@@ -24,8 +24,8 @@ import os
 import glob
 import time
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="4"
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"]="4"
 
 import numpy as np
 np.random.seed(0)
@@ -43,7 +43,7 @@ from sklearn_crfsuite import metrics
 def process_interventions():
 	print('------- CC ------')
 
-	dataset_dir = 'train/transcription/cc/'
+	dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
 	files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
 	print(files)
 	all_inv_counts_cc = []
@@ -72,7 +72,7 @@ def process_interventions():
 	print()
 	print('------- CD ------')
 
-	dataset_dir = 'train/transcription/cd/'
+	dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
 	files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
 	print(files)
 	all_inv_counts_cd = []
@@ -151,7 +151,7 @@ def process_interventions():
 def process_spectrograms():
 
 	dataset_dir = ''
-	# dataset_dir = '../spectograms/'
+	dataset_dir = '../spectograms/'
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
 	print()
 	print(cc_files)
@@ -253,6 +253,28 @@ def create_model(longest_speaker_length=40, num_classes=2,
 	return merged_model
 
 
+class data_generator():
+
+	def __init__(self, X_spectrograms, X_interventions, y, batch_size):
+
+		self.X_spectrograms = X_spectrograms
+		self.X_interventions = X_interventions
+		self.y = y
+		self.batch_size = batch_size
+		self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(horizontal_flip=True)
+
+
+	def flow(self):
+		p = np.random.permutation(len(self.X_spectrograms))
+		self.X_spectrograms = self.X_spectrograms[p]
+		self.X_interventions = self.X_interventions[p]
+		self.y = y[p]
+
+		batch_n = 0
+		for x_batch_spectograms, y_batch in self.datagen.flow(self.X_spectrograms, y):
+			x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
+			batch_n += batch_size
+			yield ([x_batch_spectograms, x_batch_interventions], y_batch)
 
 print(create_model().summary())
 
@@ -286,8 +308,8 @@ for train_index, val_index in KFold(n_split, shuffle=True, random_state=13).spli
 	x_train_spectrograms, x_val_spectrograms = X_spectrograms[train_index], X_spectrograms[val_index]
 	y_train_spectrograms, y_val_spectrograms = y_spectrograms[train_index], y_spectrograms[val_index]
 	
-	temp = x_train_spectrograms
-	print('#####################', x_train_spectrograms.shape)
+	# temp = x_train_spectrograms
+	# print('#####################', x_train_spectrograms.shape)
 	# datagen = preprocessing.image.ImageDataGenerator(horizontal_flip=True)
 	# datagen.fit(x_train_spectrograms)
 	# x_train_spectrograms = datagen.flow(x_train_spectrograms)
@@ -299,6 +321,7 @@ for train_index, val_index in KFold(n_split, shuffle=True, random_state=13).spli
 	if y_val_interventions.all()==y_val_spectrograms.all():		y_val = y_val_interventions
 
 	model = create_model()
+	datagen = data_generator(x_train_spectrograms, x_train_interventions, y_train, batch_size)
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
