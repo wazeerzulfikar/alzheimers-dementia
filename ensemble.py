@@ -189,7 +189,7 @@ def create_model(longest_speaker_length=40, num_classes=2,
 
 	###################### INTERVENTIONS ########################
 
-	model1_input = layers.Input(shape=(longest_speaker_length, 3))
+	model1_input = layers.Input(shape=(longest_speaker_length, 3), name='interventions_input')
 	model1_BN = layers.BatchNormalization()(model1_input)
 	model1_hidden = layers.LSTM(16, input_shape=(longest_speaker_length, 3))(model1_BN)
 	# model1_output = layers.Dropout(0.2)(model1_hidden)
@@ -200,7 +200,7 @@ def create_model(longest_speaker_length=40, num_classes=2,
 	###################### SPECTROGRAMS ###########################
 
 	input_shape_ = (480, 640, 3)
-	model2_input = layers.Input(shape=input_shape_)
+	model2_input = layers.Input(shape=input_shape_,  name='spectrogram_input')
 	model2_BN = layers.BatchNormalization()(model2_input)
 	
 	model2_hidden1 = layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
@@ -253,7 +253,7 @@ def create_model(longest_speaker_length=40, num_classes=2,
 	return merged_model
 
 
-class data_generator():
+class DataGenerator():
 
 	def __init__(self, X_spectrograms, X_interventions, y, batch_size):
 
@@ -261,20 +261,41 @@ class data_generator():
 		self.X_interventions = X_interventions
 		self.y = y
 		self.batch_size = batch_size
+		self.n_samples = self.X_interventions.shape[0]
 		self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(horizontal_flip=True)
 
+	def random_crop(self, images, width_crop_size=320):
+		height, width = images.shape[1:3]
+		# x_start = np.random.randint(0, 635, 320)
+		cropped_images = images
+		if np.random.random()<0.2:
+			cropped_images = images[:, :, :width_crop_size, :]
+			padding = np.zeros((images.shape[0], images.shape[1], images.shape[2]-width_crop_size, images.shape[3]))
+			cropped_images = np.concatenate((cropped_images, padding), axis=2)
+		return cropped_images
+
+
+	def __len__(self):
+		return self.n_samples//self.batch_size
 
 	def flow(self):
-		p = np.random.permutation(len(self.X_spectrograms))
-		self.X_spectrograms = self.X_spectrograms[p]
-		self.X_interventions = self.X_interventions[p]
-		self.y = y[p]
+		while True:
+			p = np.random.permutation(len(self.X_spectrograms))
+			self.X_spectrograms = self.X_spectrograms[p]
+			self.X_interventions = self.X_interventions[p]
+			self.y = self.y[p]
+			batch_n = 0
 
-		batch_n = 0
-		for x_batch_spectograms, y_batch in self.datagen.flow(self.X_spectrograms, y):
-			x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
-			batch_n += batch_size
-			yield ([x_batch_spectograms, x_batch_interventions], y_batch)
+			for x_batch_spectograms, y_batch in self.datagen.flow(self.X_spectrograms, self.y, batch_size=self.batch_size):
+				if batch_n>self.n_samples-self.batch_size:
+					break
+				x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
+				batch_n += batch_size
+				x_batch_spectograms = self.random_crop(x_batch_spectograms)
+				yield ([x_batch_interventions, x_batch_spectograms], y_batch)
+
+	def on_epoch_end():
+		print('Epoch Done!')
 
 print(create_model().summary())
 
@@ -321,7 +342,7 @@ for train_index, val_index in KFold(n_split, shuffle=True, random_state=13).spli
 	if y_val_interventions.all()==y_val_spectrograms.all():		y_val = y_val_interventions
 
 	model = create_model()
-	datagen = data_generator(x_train_spectrograms, x_train_interventions, y_train, batch_size)
+	datagen = DataGenerator(x_train_spectrograms, x_train_interventions, y_train, batch_size)
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
@@ -334,15 +355,24 @@ for train_index, val_index in KFold(n_split, shuffle=True, random_state=13).spli
 				  optimizer=tf.keras.optimizers.Adam(lr=0.001),
 				  metrics=['categorical_accuracy'])
 
-	print(x_train_interventions.shape, x_train_spectrograms.shape, y_train.shape)
-	print(x_val_interventions.shape, x_val_spectrograms.shape, y_val.shape)
+	# print(x_train_interventions.shape, x_train_spectrograms.shape, y_train.shape)
+	# print(x_val_interventions.shape, x_val_spectrograms.shape, y_val.shape)
 
-	model.fit([x_train_interventions, x_train_spectrograms], y_train,
-			  batch_size=batch_size,
+	print('Y validation counts', np.unique(np.argmax(y_val, axis=-1), return_counts=True))
+
+	model.fit(datagen.flow(),
 			  epochs=epochs,
+			  steps_per_epoch=datagen.__len__(),
 			  verbose=1,
 			  callbacks=[tensorboard],
 			  validation_data=([x_val_interventions, x_val_spectrograms], y_val))
+
+	# model.fit([x_train_interventions, x_train_spectrograms], y_train,
+	# 		  batch_size=batch_size,
+	# 		  epochs=epochs,
+	# 		  verbose=1,
+	# 		  callbacks=[tensorboard],
+	# 		  validation_data=([x_val_interventions, x_val_spectrograms], y_val))
 	# model = load_model('best_model_f{}.h5'.format(fold))
 	training_accuracy = model.evaluate([x_train_interventions, x_train_spectrograms], y_train, verbose=0)
 	validation_accuracy = model.evaluate([x_val_interventions, x_val_spectrograms], y_val, verbose=0)
