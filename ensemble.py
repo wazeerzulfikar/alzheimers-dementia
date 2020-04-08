@@ -262,16 +262,29 @@ class DataGenerator():
 		self.y = y
 		self.batch_size = batch_size
 		self.n_samples = self.X_interventions.shape[0]
-		self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(horizontal_flip=True)
+		self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+			horizontal_flip=True)
+			# samplewise_center=True,
+			# samplewise_std_normalization=True)
 
 	def random_crop(self, images, width_crop_size=320):
-		height, width = images.shape[1:3]
-		# x_start = np.random.randint(0, 635, 320)
+		height, width, channels = images.shape[1:]
 		cropped_images = images
-		if np.random.random()<0.2:
-			cropped_images = images[:, :, :width_crop_size, :]
-			padding = np.zeros((images.shape[0], images.shape[1], images.shape[2]-width_crop_size, images.shape[3]))
-			cropped_images = np.concatenate((cropped_images, padding), axis=2)
+		for i in range(len(images)):
+			if np.random.random()<0.5:
+				img = images[i]
+				pad_width_size = np.random.randint(0, width//4)
+				pad_start = np.random.randint(0, width - pad_width_size)
+
+				cropped_img_left = img[:, :pad_start, :]
+				cropped_img_right = img[:, pad_start+pad_width_size:, :]
+				padding = np.zeros((height, pad_width_size, channels))
+				cropped_img = np.concatenate((cropped_img_left, padding, cropped_img_right), axis=1)
+
+				cropped_images[i] = cropped_img
+
+		# 		cv2.imwrite( 'crop{}.jpg'.format(i), cropped_img*255.)
+		# exit()
 		return cropped_images
 
 
