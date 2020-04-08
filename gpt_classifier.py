@@ -107,25 +107,22 @@ p = np.random.permutation(len(X))
 X = X[p]
 y = y[p]
 
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    sess.run(tf.tables_initializer())
-    i = 0
-    for train_index, val_index in KFold(n_split, shuffle=True).split(X):
-        x_train, x_val = X[train_index], X[val_index]
-        y_train, y_val = y[train_index], y[val_index]
-        print(x_train.shape, y_train.shape)
-        model = create_model()
+i = 0
+for train_index, val_index in KFold(n_split, shuffle=True).split(X):
+    x_train, x_val = X[train_index], X[val_index]
+    y_train, y_val = y[train_index], y[val_index]
+    print(x_train.shape, y_train.shape)
+    model = create_model()
 
-        model.compile(loss=tf.keras.losses.categorical_crossentropy,
-                    optimizer=tf.keras.optimizers.Adam(),
-                    metrics=['categorical_accuracy'])
-        model.fit(x_train, y_train,
-                batch_size=batch_size,
-                epochs=epochs,
-                verbose=1,
-                validation_data=(x_val, y_val))
-        score = model.evaluate(x_val, y_val, verbose=0)
-        print('Val accuracy:', score)
-        i += 1
-        model.save_weights(data_path+'model_gpt_w_f'+i+'.h5')
+    model.compile(loss=tf.keras.losses.categorical_crossentropy,
+                optimizer=tf.keras.optimizers.Adam(),
+                metrics=['categorical_accuracy'])
+    model.fit(x_train, y_train,
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=1,
+            validation_data=(x_val, y_val))
+    score = model.evaluate(x_val, y_val, verbose=0)
+    print('Val accuracy:', score)
+    i += 1
+    model.save_weights(data_path+'model_gpt_w_f'+i+'.h5')
