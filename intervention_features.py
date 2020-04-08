@@ -142,34 +142,6 @@ y_cd[:,1] = 1
 X = np.concatenate((all_speakers_cc_binary, all_speakers_cd_binary), axis=0).astype(np.float32)
 y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 
-### FOR CRF ###
-
-# def make_features(x):
-
-#     features = {
-#     'INV' : False,
-#     'PAR' : False
-#     }
-#     features[x] = True
-#     return features
-
-# x_cc = []
-# for x in all_speakers_cc:
-#     x_cc.append([[make_features(i) for i in x]])
-
-# x_cd = []
-# for x in all_speakers_cc:
-#     x_cd.append([[make_features(i) for i in x]])
-
-# X = np.concatenate((x_cc, x_cd), axis=0)
-
-# y_cc = ['cc']*len(all_speakers_cc)
-# y_cd = ['cd']*len(all_speakers_cd)
-
-# y = np.concatenate((y_cc, y_cd), axis=0)
-# y = np.expand_dims(y, axis=-1)
-##############
-
 p = np.random.permutation(len(X))
 X = X[p]
 y = y[p]
