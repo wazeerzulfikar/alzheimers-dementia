@@ -18,7 +18,7 @@ def audio_length(files):
 
 	return lengths
 
-dataset_dir = 'ADReSS-IS2020-data/train/Full_wave_enhanced_audio'
+dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc/*.wav')))
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd/*.wav')))
 
@@ -38,7 +38,7 @@ def get_substring(file):
 	start = file.find('/S')+1
 	return file[start : start+4]
 
-dataset_dir = 'ADReSS-IS2020-data/train/Normalised_audio-chunks'
+dataset_dir = '../ADReSS-IS2020-data/train/Normalised_audio-chunks'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc/*.wav')))
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd/*.wav')))
 
