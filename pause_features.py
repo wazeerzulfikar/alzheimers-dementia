@@ -93,12 +93,14 @@ for filename in files:
 dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
 all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
-all_pause_rates_cc = []
+all_pause_rates_cc, all_inv_rates_cc = [], []
 for idx, pause_counts in enumerate(all_pause_counts_cc):
 	pause_rates = []
 	for p in pause_counts:
 		pause_rates.append(p/all_audio_lengths_cc[idx][0])
 	all_pause_rates_cc.append(pause_rates)
+for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
+	all_inv_rates_cc.append([inv[0]/audio[0]])
 
 # print('*'*100)
 # print(all_inv_counts_cc)
@@ -142,20 +144,22 @@ for filename in files:
 dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
 all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
-all_pause_rates_cd = []
+all_pause_rates_cd, all_inv_rates_cd = [], []
 for idx, pause_counts in enumerate(all_pause_counts_cd):
 	pause_rates = []
 	for p in pause_counts:
 		pause_rates.append(p/all_audio_lengths_cd[idx][0])
 	all_pause_rates_cd.append(pause_rates)
+for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
+	all_inv_rates_cd.append([inv[0]/audio[0]])
 
 print('-'*100)
 
 # all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
 # all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
 
-all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_rates_cc), axis=-1)
-all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_rates_cd), axis=-1)
+all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc), axis=-1)
+all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd), axis=-1)
 
 # all_counts_cc = preprocessing.normalize(all_counts_cc)
 # all_counts_cd = preprocessing.normalize(all_counts_cd)
@@ -185,16 +189,18 @@ def create_model():
 	# model.add(layers.Dense(2, activation='softmax'))
 	model = tf.keras.Sequential()
 	model.add(layers.Input(shape=(10,)))
-	model.add(layers.Dense(16, activation='relu'))
-	model.add(layers.Dense(32, activation='relu'))
-	model.add(layers.Dense(64, activation='relu'))
-	model.add(layers.Dense(128, activation='relu'))
-	# model.add(layers.Dense(256, activation='sigmoid'))
-	model.add(layers.Dense(128, activation='relu'))
-	model.add(layers.Dense(64, activation='relu'))
-	model.add(layers.Dense(32, activation='relu'))
-	model.add(layers.Dense(16, activation='relu'))
-	# model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
+	# model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+	# model.add(layers.Dense(64, activation='relu'))
+	# model.add(layers.Dense(128, activation='relu'))
+	# # model.add(layers.Dense(256, activation='sigmoid'))
+	# model.add(layers.Dense(128, activation='relu'))
+	# model.add(layers.Dense(64, activation='relu'))
+	model.add(layers.Dropout(0.5))
+	model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
+	model.add(layers.Dropout(0.5))
+	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
+	model.add(layers.Dropout(0.5))
 	model.add(layers.Dense(2, activation='softmax'))
 	return model
 
@@ -244,7 +250,6 @@ for train_index, val_index in KFold(n_split).split(X):
 print('Train accuracies ', train_accuracies)
 print('Train mean', np.mean(train_accuracies))
 print('Train std', np.std(train_accuracies))
-
 
 print('Val accuracies ', val_accuracies)
 print('Val mean', np.mean(val_accuracies))

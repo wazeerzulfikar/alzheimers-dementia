@@ -25,13 +25,13 @@ cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd/*.wav')))
 cc_lengths = audio_length(cc_files)
 cd_lengths = audio_length(cd_files)
 
-print('CC')
-print(cc_lengths)
-print(np.min(cc_lengths), np.mean(cc_lengths), np.max(cc_lengths))
+# print('CC')
+# print(cc_lengths)
+# print(np.min(cc_lengths), np.mean(cc_lengths), np.max(cc_lengths))
 
-print('\nCD')
-print(cd_lengths)
-print(np.min(cd_lengths), np.mean(cd_lengths), np.max(cd_lengths))
+# print('\nCD')
+# print(cd_lengths)
+# print(np.min(cd_lengths), np.mean(cd_lengths), np.max(cd_lengths))
 
 
 def get_substring(file):
@@ -64,11 +64,11 @@ for unique in cd_uniques:
 			a.append(file)
 	cd_threshold_lengths.append(np.sum(audio_length(a)))
 
-print('\nCC thresholded')
-print(cc_threshold_lengths)
-print(np.min(cc_threshold_lengths), np.mean(cc_threshold_lengths), np.max(cc_threshold_lengths))
+# print('\nCC thresholded')
+# print(cc_threshold_lengths)
+# print(np.min(cc_threshold_lengths), np.mean(cc_threshold_lengths), np.max(cc_threshold_lengths))
 
-print('\nCD thresholded')
-print(cd_threshold_lengths)
-print(np.min(cd_threshold_lengths), np.mean(cd_threshold_lengths), np.max(cd_threshold_lengths))
+# print('\nCD thresholded')
+# print(cd_threshold_lengths)
+# print(np.min(cd_threshold_lengths), np.mean(cd_threshold_lengths), np.max(cd_threshold_lengths))
 
