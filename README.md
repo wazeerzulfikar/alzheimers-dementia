@@ -7,4 +7,4 @@ Alzheimer's Dementia Recognition through Spontaneous Speech
 
 tried for different values of C and gamma, best values C = 10, gamma = 0.5
 5 folds, these are the results
-![picture](svm_cv.png)
+![picture](images/svm_cv.png)
