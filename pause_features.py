@@ -19,6 +19,20 @@ from sklearn import preprocessing
 def clean_file(lines):
 	return re.sub(r'[0-9]+[_][0-9]+', '', lines.replace("*INV:", "").replace("*PAR:", "")).strip().replace("\x15", "").replace("\n", "").replace("\t", " ").replace("[+ ", "[+").replace("[* ", "[*").replace("[: ", "[:").replace(" .", "").replace("'s", "").replace(" ?", "").replace(" !", "").replace(" ]", "]").lower()
 
+def extra_clean(lines):
+	lines = clean_file(lines)
+	lines = lines.replace("[+exc]", "")
+	lines = lines.replace("[+gram]", "")
+	lines = lines.replace("[+es]", "")
+	lines = re.sub(r'[&][=]*[a-z]+', '', lines) #remove all &=text
+	lines = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', lines) #remove all [*char:char(s)]
+	lines = re.sub(r'[^A-Za-z0-9\s_]+', '', lines) #remove all remaining symbols except underscore
+	lines = re.sub(r'[_]', ' ', lines) #replace underscore with space
+	return lines
+
+def words_count(content):
+	extra_cleaned = extra_clean(content).split(" ")
+	return len(extra_cleaned) - extra_cleaned.count('')
 
 def get_pauses_cnt(file):
 	cnt = 0
@@ -67,10 +81,12 @@ dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
 all_pause_counts_cc = []
 all_inv_counts_cc = []
+all_word_counts_cc = []
 for filename in files:
 	inv_count = 0
 	with open(filename, 'r') as f:
 		content = f.read()
+		words_counter = words_count(content)
 		clean_content = clean_file(content)
 		pause_count = get_pauses_cnt(clean_content) # list    
 		content = content.split('\n')
@@ -86,6 +102,7 @@ for filename in files:
 		PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1 
 		speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
 		inv_count = speaker_cc.count('INV') # number
+	all_word_counts_cc.append([words_counter/50])
 	all_inv_counts_cc.append([inv_count])
 	all_pause_counts_cc.append(pause_count)
 	# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
@@ -93,7 +110,7 @@ for filename in files:
 dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
 all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
-all_pause_rates_cc, all_inv_rates_cc = [], []
+all_pause_rates_cc, all_inv_rates_cc, all_word_rates_cc = [], [], []
 for idx, pause_counts in enumerate(all_pause_counts_cc):
 	pause_rates = []
 	for p in pause_counts:
@@ -101,11 +118,15 @@ for idx, pause_counts in enumerate(all_pause_counts_cc):
 	all_pause_rates_cc.append(pause_rates)
 for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
 	all_inv_rates_cc.append([inv[0]/audio[0]])
+for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
+	all_word_rates_cc.append([w[0]/audio[0]])
 
 # print('*'*100)
 # print(all_inv_counts_cc)
 # print('*'*100)
 # print(all_pause_counts_cc)
+# print('*'*100)
+# print(all_word_counts_cc)
 # print('*'*100)
 # print(all_audio_lengths_cc)
 # print('*'*100)
@@ -118,10 +139,12 @@ dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
 all_pause_counts_cd = []
 all_inv_counts_cd = []
+all_word_counts_cd = []
 for filename in files:
 	inv_count = 0
 	with open(filename, 'r') as f:
 		content = f.read()
+		words_counter = words_count(content)
 		clean_content = clean_file(content)
 		pause_count = get_pauses_cnt(clean_content)  
 		content = content.split('\n')
@@ -137,6 +160,7 @@ for filename in files:
 		PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1 
 		speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
 		inv_count = speaker_cd.count('INV')
+	all_word_counts_cd.append([words_counter/50])
 	all_inv_counts_cd.append([inv_count])
 	all_pause_counts_cd.append(pause_count)
 	# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
@@ -144,7 +168,7 @@ for filename in files:
 dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
 files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
 all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
-all_pause_rates_cd, all_inv_rates_cd = [], []
+all_pause_rates_cd, all_inv_rates_cd, all_word_rates_cd = [], [], []
 for idx, pause_counts in enumerate(all_pause_counts_cd):
 	pause_rates = []
 	for p in pause_counts:
@@ -152,17 +176,19 @@ for idx, pause_counts in enumerate(all_pause_counts_cd):
 	all_pause_rates_cd.append(pause_rates)
 for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
 	all_inv_rates_cd.append([inv[0]/audio[0]])
+for w, audio in zip(all_word_counts_cd, all_audio_lengths_cd):
+	all_word_rates_cd.append([w[0]/audio[0]])
 
 print('-'*100)
 
 # all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
 # all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
 
-all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc), axis=-1)
-all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd), axis=-1)
+all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc, all_word_rates_cc), axis=-1)
+all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd, all_word_rates_cd), axis=-1)
 
-# all_counts_cc = preprocessing.normalize(all_counts_cc)
-# all_counts_cd = preprocessing.normalize(all_counts_cd)
+# all_counts_cc = preprocessing.normalize(all_counts_cc, axis=0)
+# all_counts_cd = preprocessing.normalize(all_counts_cd, axis=0)
 
 X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
@@ -188,19 +214,20 @@ def create_model():
 	# model.add(layers.Dropout(0.2))
 	# model.add(layers.Dense(2, activation='softmax'))
 	model = tf.keras.Sequential()
-	model.add(layers.Input(shape=(10,)))
-	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
+	model.add(layers.Input(shape=(11,)))
+	# model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 	# model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
 	# model.add(layers.Dense(64, activation='relu'))
 	# model.add(layers.Dense(128, activation='relu'))
-	# # model.add(layers.Dense(256, activation='sigmoid'))
+	# model.add(layers.Dense(256, activation='sigmoid'))
 	# model.add(layers.Dense(128, activation='relu'))
 	# model.add(layers.Dense(64, activation='relu'))
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))
-	model.add(layers.Dropout(0.5))
+	# model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+	# model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(16, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+	# model.add(layers.Dropout(0.2))
 	model.add(layers.Dense(2, activation='softmax'))
 	return model
 
