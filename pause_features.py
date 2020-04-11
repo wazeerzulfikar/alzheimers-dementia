@@ -122,18 +122,6 @@ def prepare_data():
 	for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
 		all_word_rates_cc.append([w[0]/audio[0]])
 
-	# print('*'*100)
-	# print(all_inv_counts_cc)
-	# print('*'*100)
-	# print(all_pause_counts_cc)
-	# print('*'*100)
-	# print(all_word_counts_cc)
-	# print('*'*100)
-	# print(all_audio_lengths_cc)
-	# print('*'*100)
-	# print(all_pause_rates_cc)
-	# exit()
-
 	print('-'*100)
 
 	dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
@@ -193,6 +181,34 @@ def prepare_data():
 
 	X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
+	### Regression y values
+	y_reg_cc = np.zeros((len(all_counts_cc), ))
+	file = open('../ADReSS-IS2020-data/train/cc_meta_data.txt', 'r+')
+	lines = file.readlines()[1:]
+	for idx, line in enumerate(lines):
+		token = line.split('; ')[-1].strip('\n')
+		if token!='NA':		token = int(token)
+		else:	token = -1
+		y_reg_cc[idx] = token
+
+	y_reg_cd = np.zeros((len(all_counts_cd), ))
+	file = open('../ADReSS-IS2020-data/train/cd_meta_data.txt', 'r+')
+	lines = file.readlines()[1:]
+	for idx, line in enumerate(lines):
+		token = line.split('; ')[-1].strip('\n')
+		if token!='NA':		token = int(token)
+		else:	token = -1
+		y_reg_cd[idx] = token
+
+	y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+	#######################
+
+	### Regression X values
+	to_exclude = np.argwhere(y_reg==-1)
+	X_reg = np.delete(X, to_exclude, 0).astype(np.float32)
+	#######################
+
+	### Classification y values
 	y_cc = np.zeros((len(all_counts_cc), 2))
 	y_cc[:,0] = 1
 
@@ -200,13 +216,15 @@ def prepare_data():
 	y_cd[:,1] = 1
 
 	y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+	#######################
 
 	np.random.seed(0)
 	p = np.random.permutation(len(X))
-	X = X[p]
-	y = y[p]
+	p_reg = np.random.permutation(len(X_reg))
+	X, X_reg = X[p], X_reg[p_reg]
+	y, y_reg = y[p], y_reg[p_reg]
 
-	return X, y
+	return X, y, X_reg, y_reg
 
 
 def create_model():
@@ -248,7 +266,7 @@ def training():
 	val_accuracies = []
 	train_accuracies = []
 
-	X, y = prepare_data()
+	X, y, _, _ = prepare_data()
 	fold = 0
 
 	for train_index, val_index in KFold(n_split).split(X):

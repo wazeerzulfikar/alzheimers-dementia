@@ -8,7 +8,7 @@ import pause_features
 import spectrogram_features
 import intervention_features
 
-X1, y1 = pause_features.prepare_data
+X1, y1, _, _ = pause_features.prepare_data
 
 def majority_voting(X1, X2, X3, y, models):
 	'''
