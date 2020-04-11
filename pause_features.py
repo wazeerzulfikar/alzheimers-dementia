@@ -208,6 +208,135 @@ def prepare_data():
 
 	return X, y
 
+dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
+files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
+all_pause_counts_cc = []
+all_inv_counts_cc = []
+all_word_counts_cc = []
+for filename in files:
+	inv_count = 0
+	with open(filename, 'r') as f:
+		content = f.read()
+		words_counter = words_count(content)
+		clean_content = clean_file(content)
+		pause_count = get_pauses_cnt(clean_content) # list
+		content = content.split('\n')
+		speaker_cc = []
+
+		for c in content:
+			if 'INV' in c:
+				speaker_cc.append('INV')
+			if 'PAR' in c:
+				speaker_cc.append('PAR')
+
+		PAR_first_index = speaker_cc.index('PAR')
+		PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1
+		speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
+		inv_count = speaker_cc.count('INV') # number
+	all_word_counts_cc.append([words_counter/50])
+	all_inv_counts_cc.append([inv_count])
+	all_pause_counts_cc.append(pause_count)
+	# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
+
+dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
+files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
+all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
+all_pause_rates_cc, all_inv_rates_cc, all_word_rates_cc = [], [], []
+for idx, pause_counts in enumerate(all_pause_counts_cc):
+	pause_rates = []
+	for p in pause_counts:
+		pause_rates.append(p/all_audio_lengths_cc[idx][0])
+	all_pause_rates_cc.append(pause_rates)
+for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
+	all_inv_rates_cc.append([inv[0]/audio[0]])
+for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
+	all_word_rates_cc.append([w[0]/audio[0]])
+
+# print('*'*100)
+# print(all_inv_counts_cc)
+# print('*'*100)
+# print(all_pause_counts_cc)
+# print('*'*100)
+# print(all_word_counts_cc)
+# print('*'*100)
+# print(all_audio_lengths_cc)
+# print('*'*100)
+# print(all_pause_rates_cc)
+# exit()
+
+print('-'*100)
+
+dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
+files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
+all_pause_counts_cd = []
+all_inv_counts_cd = []
+all_word_counts_cd = []
+for filename in files:
+	inv_count = 0
+	with open(filename, 'r') as f:
+		content = f.read()
+		words_counter = words_count(content)
+		clean_content = clean_file(content)
+		pause_count = get_pauses_cnt(clean_content)
+		content = content.split('\n')
+		speaker_cd = []
+
+		for c in content:
+			if 'INV' in c:
+				speaker_cd.append('INV')
+			if 'PAR' in c:
+				speaker_cd.append('PAR')
+
+		PAR_first_index = speaker_cd.index('PAR')
+		PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1
+		speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
+		inv_count = speaker_cd.count('INV')
+	all_word_counts_cd.append([words_counter/50])
+	all_inv_counts_cd.append([inv_count])
+	all_pause_counts_cd.append(pause_count)
+	# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
+
+dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
+files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
+all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
+all_pause_rates_cd, all_inv_rates_cd, all_word_rates_cd = [], [], []
+for idx, pause_counts in enumerate(all_pause_counts_cd):
+	pause_rates = []
+	for p in pause_counts:
+		pause_rates.append(p/all_audio_lengths_cd[idx][0])
+	all_pause_rates_cd.append(pause_rates)
+for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
+	all_inv_rates_cd.append([inv[0]/audio[0]])
+for w, audio in zip(all_word_counts_cd, all_audio_lengths_cd):
+	all_word_rates_cd.append([w[0]/audio[0]])
+
+print('-'*100)
+
+# all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
+# all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
+
+all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc, all_word_rates_cc), axis=-1)
+all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd, all_word_rates_cd), axis=-1)
+
+# all_counts_cc = preprocessing.normalize(all_counts_cc, axis=0)
+# all_counts_cd = preprocessing.normalize(all_counts_cd, axis=0)
+
+X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
+
+y_cc = np.zeros((len(all_counts_cc), 2))
+y_cc[:,0] = 1
+
+y_cd = np.zeros((len(all_counts_cd), 2))
+y_cd[:,1] = 1
+
+y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+
+np.random.seed(0)
+p = np.random.permutation(len(X))
+X = X[p]
+y = y[p]
+>>>>>>> d9c07291f834bc0976c25ccfb3b939489552349b
+
 def create_model():
 	# model = tf.keras.Sequential()
 	# model.add(layers.Input(shape=(10,)))

@@ -27,16 +27,18 @@ import cv2
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import OneHotEncoder
 
+import spectogram_augmentation
+
 
 dataset_dir = ''
-# dataset_dir = '../spectograms/'
+dataset_dir = '../spectograms/'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
-X_cc = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cc_files])
+X_cc = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cc_files])
 y_cc = np.zeros((X_cc.shape[0], 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-X_cd = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cd_files])
+X_cd = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cd_files])
 y_cd = np.zeros((X_cd.shape[0], 2))
 y_cd[:,1] = 1
 
@@ -55,9 +57,82 @@ print(inp_shape) # (480, 640, 3)
 print('#####################')
 num_classes = 2
 
-################################ MODEL ################################
+class DataGenerator():
 
-def create_model(_type_='convolutional', _binning_=False):
+	def __init__(self, X_spectrograms, y, batch_size, split='train'):
+
+		self.X_spectrograms = X_spectrograms
+		# self.X_interventions = X_interventions
+		self.y = y
+		self.batch_size = batch_size
+		self.n_samples = self.X_spectrograms.shape[0]
+		if split=='train':
+			self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+				horizontal_flip=True)
+
+		elif split=='val':
+			self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+				horizontal_flip=True)
+
+	def random_crop(self, images, width_crop_size=320):
+		height, width, channels = images.shape[1:]
+		cropped_images = images
+		for i in range(len(images)):
+			if np.random.random()<0.5:
+				img = images[i]
+				pad_width_size = np.random.randint(0, width//4)
+				pad_start = np.random.randint(0, width - pad_width_size)
+
+				cropped_img_left = img[:, :pad_start, :]
+				cropped_img_right = img[:, pad_start+pad_width_size:, :]
+				padding = np.zeros((height, pad_width_size, channels))
+				cropped_img = np.concatenate((cropped_img_left, padding, cropped_img_right), axis=1)
+
+				cropped_images[i] = cropped_img
+
+		return cropped_images
+
+
+	def get_n_batches(self):
+		return self.n_samples//self.batch_size
+
+	# def run_on_batch(self, batch, aug, prob=0.0):
+	# 	aug_images = []
+	# 	for img in batch:
+	# 		if np.random.random()<prob:
+	# 			aug_images.append(aug(img[None,...]))
+	# 		else:
+	# 			aug_images.append(img)
+
+	def flow(self):
+		while True:
+			p = np.random.permutation(len(self.X_spectrograms))
+			self.X_spectrograms = self.X_spectrograms[p]
+			# self.X_interventions = self.X_interventions[p]
+			self.y = self.y[p]
+			batch_n = 0
+
+			for x_batch_spectograms, y_batch in self.datagen.flow(self.X_spectrograms, self.y, batch_size=self.batch_size):
+				if batch_n>self.n_samples-self.batch_size:
+					break
+				# x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
+				batch_n += 1
+				original = x_batch_spectograms
+				x_batch_spectograms = spectogram_augmentation.augment_pitch_and_tempo(x_batch_spectograms)
+				x_batch_spectograms = spectogram_augmentation.augment_freq_time_mask(x_batch_spectograms)
+				# for i in range(len(np.array(x_batch_spectograms))):
+				# i=0
+				# cv2.imwrite('sample_images/{}_orig.jpg'.format(batch_n), np.array(original[i])*255.)
+				# cv2.imwrite('sample_images/{}_crop.jpg'.format(batch_n), np.array(x_batch_spectograms[i])*255.)
+				# x_batch_spectograms = self.random_crop(x_batch_spectograms)
+				# exit()
+				yield (x_batch_spectograms, y_batch)
+
+	def on_epoch_end():
+		print('Epoch Done!')
+
+
+def create_model(_type_ = 'convolutional'):
 
 	if _type_=='convolutional':
 
@@ -87,11 +162,29 @@ def create_model(_type_='convolutional', _binning_=False):
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Flatten())
-		model.add(layers.Dropout(0.5)) # 0.5
-		model.add(layers.Dense(128, activation='relu'))
-		model.add(layers.Dropout(0.2))
-		model.add(layers.Dense(num_classes, activation='softmax'))
+		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
+
+		model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1),
+						 activation='relu'))
+		model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2),
+						 activation='relu'))
+		model.add(layers.BatchNormalization())
+
+		# model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2),
+		# 				 activation='relu'))
+		# model.add(layers.BatchNormalization())
+
+		# model.add(layers.Flatten())
+		# model.add(layers.Dropout(0.5)) # 0.5
+		# model.add(layers.Dense(128, activation='relu'))
+		# model.add(layers.Dropout(0.5))
+		model.add(layers.Conv2D(num_classes, kernel_size=(1,1)))
+		model.add(layers.GlobalAveragePooling2D())
+		model.add(layers.Activation('softmax'))
 
 	if _type_=='recurrent':
 
@@ -153,9 +246,8 @@ def create_model(_type_='convolutional', _binning_=False):
 
 	return model
 
-#######################################################################
 
-model = create_model()
+model = create_model(_type_='convolutional')
 print(model.summary())
 print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
@@ -163,45 +255,54 @@ print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 ################################# CROSS VALIDATED MODEL TRAINING ################################
 
 n_split = 5
-epochs = 50 # 25 # 50
-batch_size = 8 # 8 # 16?
 
-training_accuracies, validation_accuracies = [], []
+epochs = 50
+batch_size = 8
+
+val_accuracies = []
+train_accuracies = []
 
 for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 
 	x_train, x_val = X[train_index], X[val_index]
 	y_train, y_val = y[train_index], y[val_index]
-	model = create_model()
+
+	model = create_model(_type_='convolutional')
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
 
-	tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
+	# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
 
 	model.compile(loss=tf.keras.losses.categorical_crossentropy,
 				  optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
 				  metrics=['categorical_accuracy'])
-	model.fit(x_train, y_train,
-			  batch_size=batch_size,
+
+	datagen = DataGenerator(x_train, y_train, batch_size)
+
+	checkpointer = tf.keras.callbacks.ModelCheckpoint(
+            'best_model.h5', monitor='val_loss', verbose=0, save_best_only=False,
+            save_weights_only=False, mode='auto', save_freq='epoch'
+        )
+	model.fit(datagen.flow(),
 			  epochs=epochs,
+			  steps_per_epoch=datagen.get_n_batches(),
 			  verbose=1,
-			  callbacks=[tensorboard],
-			  validation_data=(x_val, y_val))
-	training_accuracy = model.evaluate(x_train, y_train, verbose=0)
-	validation_accuracy = model.evaluate(x_val, y_val, verbose=0)
-	training_accuracies.append(training_accuracy[1])
-	validation_accuracies.append(validation_accuracy[1])
+			  callbacks=[checkpointer],
+			  validation_data=( x_val, y_val))
+	model = tf.keras.models.load_model('best_model.h5')
+	train_score = model.evaluate(x_train, y_train, verbose=0)
 
-	print()
-	print('Predictions : ', model.predict(x_val))
-	print('True values : ', y_val)
-	print('Val accuracy:', validation_accuracy[1])
-	print('Training Accuracies till now : ', training_accuracies, '\tValidation Accuracies till now : ', validation_accuracies)
-	print()
+	train_accuracies.append(train_score[1])
+	score = model.evaluate(x_val, y_val, verbose=0)
+	print('Val accuracy:', score[1])
+	val_accuracies.append(score[1])
 
-	# exit()
+	print('Train accuracies ', train_accuracies)
+	print('Train mean', np.mean(train_accuracies))
+	print('Train std', np.std(train_accuracies))
 
-print(np.mean(validation_accuracies), '\t', np.std(validation_accuracies))
 
-##################################################################################################
+	print('Val accuracies ', val_accuracies)
+	print('Val mean', np.mean(val_accuracies))
+	print('Val std', np.std(val_accuracies))
