@@ -41,3 +41,4 @@ def majority_voting(X1, X2, X3, y, models):
 		fold+=1
 
 	return all_accuracies
+
