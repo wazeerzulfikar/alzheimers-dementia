@@ -88,7 +88,7 @@ for filename in files:
 		content = f.read()
 		words_counter = words_count(content)
 		clean_content = clean_file(content)
-		pause_count = get_pauses_cnt(clean_content) # list    
+		pause_count = get_pauses_cnt(clean_content) # list
 		content = content.split('\n')
 		speaker_cc = []
 
@@ -97,9 +97,9 @@ for filename in files:
 				speaker_cc.append('INV')
 			if 'PAR' in c:
 				speaker_cc.append('PAR')
-		
+
 		PAR_first_index = speaker_cc.index('PAR')
-		PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1 
+		PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1
 		speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
 		inv_count = speaker_cc.count('INV') # number
 	all_word_counts_cc.append([words_counter/50])
@@ -146,7 +146,7 @@ for filename in files:
 		content = f.read()
 		words_counter = words_count(content)
 		clean_content = clean_file(content)
-		pause_count = get_pauses_cnt(clean_content)  
+		pause_count = get_pauses_cnt(clean_content)
 		content = content.split('\n')
 		speaker_cd = []
 
@@ -155,9 +155,9 @@ for filename in files:
 				speaker_cd.append('INV')
 			if 'PAR' in c:
 				speaker_cd.append('PAR')
-		
+
 		PAR_first_index = speaker_cd.index('PAR')
-		PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1 
+		PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1
 		speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
 		inv_count = speaker_cd.count('INV')
 	all_word_counts_cd.append([words_counter/50])
