@@ -19,11 +19,11 @@ import os
 import glob
 import time
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import numpy as np
-np.random.seed(42)
+np.random.seed(0)
 
 import cv2
 from sklearn.model_selection import KFold
@@ -32,16 +32,17 @@ from sklearn.preprocessing import OneHotEncoder
 import spectogram_augmentation
 import dataset_features
 
+spectogram_size = (480, 640)
 
 dataset_dir = ''
 dataset_dir = '../spectograms/'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
-X_cc = np.array([dataset_features.get_spectogram_features(f) for f in cc_files])
+X_cc = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cc_files])
 y_cc = np.zeros((X_cc.shape[0], 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-X_cd = np.array([dataset_features.get_spectogram_features(f) for f in cd_files])
+X_cd = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cd_files])
 y_cd = np.zeros((X_cd.shape[0], 2))
 y_cd[:,1] = 1
 
@@ -136,38 +137,43 @@ class DataGenerator():
 
 def create_model(_type_ = 'convolutional'):
 
-	if _type_=='convolutional':
+	if _type_=='fully_convolutional':
 
 		model = tf.keras.Sequential()
 		model.add(layers.Input(inp_shape))
 		# model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
 		# 				 activation='relu'))
-		model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
+		model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
 						 activation='relu'))
+		model.add(layers.MaxPooling2D())
 		model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
 		# 				 activation='relu'))
-		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
 						 activation='relu'))
+		model.add(layers.MaxPooling2D())
 		model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
 		# 				 activation='relu'))
-		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
 						 activation='relu'))
+		model.add(layers.MaxPooling2D())
 		model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
 		# 				 activation='relu'))
-		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
 						 activation='relu'))
+		model.add(layers.MaxPooling2D())
 		model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
 		# 				 activation='relu'))
-		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
+		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
 						 activation='relu'))
+		model.add(layers.MaxPooling2D())
 		model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1),
@@ -182,14 +188,15 @@ def create_model(_type_ = 'convolutional'):
 
 		# model.add(layers.Flatten())
 		# model.add(layers.Dropout(0.5)) # 0.5
-		model.add(layers.GlobalAveragePooling2D())
-		model.add(layers.Dropout(0.5)) # 0.5
-		model.add(layers.Dense(128, activation='relu'))
-		model.add(layers.Dropout(0.5))
-		model.add(layers.Dense(num_classes, activation='softmax'))
+		# model.add(layers.GlobalAveragePooling2D())
+		# model.add(layers.Dropout(0.5)) # 0.5
+		# model.add(layers.Dense(128, activation='relu'))
+		# model.add(layers.Dropout(0.5))
+		# model.add(layers.Dense(num_classes, activation='softmax'))
 
-		# model.add(layers.Conv2D(num_classes, kernel_size=(1,1)))
-		# model.add(layers.Activation('softmax'))
+		model.add(layers.Conv2D(num_classes, kernel_size=(1,1)))
+		model.add(layers.GlobalMaxPooling2D())
+		model.add(layers.Activation('softmax'))
 
 	if _type_=='convolutional_1':
 
@@ -338,7 +345,7 @@ def create_model(_type_ = 'convolutional'):
 	return model
 
 
-model = create_model(_type_='old')
+model = create_model(_type_='fully_convolutional')
 
 print(model.summary())
 print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
@@ -361,7 +368,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	y_train, y_val = y[train_index], y[val_index]
 	filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
-	model = create_model(_type_='old')
+	model = create_model(_type_='fully_convolutional')
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
@@ -385,8 +392,6 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  callbacks=[checkpointer],
 			  validation_data=(x_val, y_val))
 	model = tf.keras.models.load_model('best_model_spec_2_{}.h5'.format(fold))
-
-	print('_'*30)
 
 	val_pred = model.predict(x_val)
 	for i in range(len(x_val)):
