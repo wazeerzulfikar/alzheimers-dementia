@@ -263,7 +263,7 @@ def regression(models):
 	_, _, X_reg, y_reg = prepare_data()
 	fold = 0
 	n_split = 5
-	epochs = 1000
+	epochs = 1500
 	batch_size = 8
 
 	train_scores, val_scores = [], []
@@ -290,6 +290,7 @@ def regression(models):
 		model_reg.add(layers.Dropout(0.5))
 		model_reg.add(layers.Dense(1, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 
+		# print(model_reg.summary())
 		model_reg.compile(loss=tf.keras.losses.mean_squared_error, 
 			optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
@@ -328,21 +329,38 @@ def regression(models):
 	print('Val std', np.std(val_scores))
 	print()
 
-	print('Train True values')
-	print(all_train_true)
-	print()
+	print('################### TRAIN VALUES ###################')
+	for f in range(n_split):
+		print()
+		print('################### FOLD {} ###################'.format(f))
+		print('True Values \t Predicted Values')
+		for i in range(all_train_true[f].shape[0]):
+			print(all_train_true[f][i], '\t\t', all_train_predictions[f][i,0])
 
-	print('Train predicted values')
-	print(all_train_predictions)
 	print()
+	print('################### VAL VALUES ###################')
+	for f in range(n_split):
+		print()
+		print('################### FOLD {} ###################'.format(f))
+		print('True Values \t Predicted Values')
+		for i in range(all_val_true[f].shape[0]):
+			print(all_val_true[f][i], '\t\t', all_val_predictions[f][i,0])
 
-	print('Val True values')
-	print(all_val_true)
-	print()
+	# print('Train True values')
+	# print(all_train_true)
+	# print()
 
-	print('Val predicted values')
-	print(all_val_predictions)
-	print()
+	# print('Train predicted values')
+	# print(all_train_predictions)
+	# print()
+
+	# print('Val True values')
+	# print(all_val_true)
+	# print()
+
+	# print('Val predicted values')
+	# print(all_val_predictions)
+	# print()
 
 
 def training():
