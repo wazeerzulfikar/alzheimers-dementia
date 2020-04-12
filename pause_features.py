@@ -256,6 +256,18 @@ def create_model():
 	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 	return model
 
+def regression_baseline():
+
+	_, _, _, y_reg = prepare_data()
+	values = []
+	for i in range(50):
+		value = math.sqrt(np.mean(list(map(lambda x: (x-i)**2, list(y_reg)))))
+		values.append(value)
+	print(values)
+	print()
+	print(np.argmin(values), np.min(values)) # 23 	7.18279838173066
+
+
 def regression(models):
 	'''
 	models is a list of loaded models
@@ -426,9 +438,15 @@ def training():
 	return models
 
 # models = training()
-models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
-print(models)
-regression(models)
+
+# models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
+# print(models)
+# regression(models)
+
+regression_baseline()
+
+
+
 
 # thresholds = []
 
