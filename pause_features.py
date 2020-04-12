@@ -143,8 +143,8 @@ def regression(models):
 
 		model = models[fold]
 		model.pop()
-		# for layer in model.layers:
-		# 	layer.trainable = False
+		for layer in model.layers:
+			layer.trainable = False
 
 		model_reg = tf.keras.Sequential()
 		model_reg.add(model)
