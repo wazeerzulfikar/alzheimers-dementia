@@ -303,6 +303,7 @@ batch_size = 8
 
 val_accuracies = []
 train_accuracies = []
+fold = 0
 
 for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 
@@ -323,7 +324,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	datagen = DataGenerator(x_train, y_train, batch_size)
 
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model.h5', monitor='val_loss', verbose=0, save_best_only=False,
+            'best_model_spec_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
             save_weights_only=False, mode='auto', save_freq='epoch'
         )
 	model.fit(datagen.flow(),
@@ -332,7 +333,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  verbose=1,
 			  callbacks=[checkpointer],
 			  validation_data=(x_val, y_val))
-	model = tf.keras.models.load_model('best_model.h5')
+	model = tf.keras.models.load_model('best_model_spec_{}.h5'.format(fold))
 	train_score = model.evaluate(x_train, y_train, verbose=0)
 
 	train_accuracies.append(train_score[1])
@@ -344,7 +345,8 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	print('Train mean', np.mean(train_accuracies))
 	print('Train std', np.std(train_accuracies))
 
-
 	print('Val accuracies ', val_accuracies)
 	print('Val mean', np.mean(val_accuracies))
 	print('Val std', np.std(val_accuracies))
+
+	fold+=1

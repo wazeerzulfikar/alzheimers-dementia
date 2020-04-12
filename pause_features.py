@@ -286,10 +286,11 @@ def regression(models):
 
 		model_reg = tf.keras.Sequential()
 		model_reg.add(model)
+		model_reg.add(layers.Dense(16, activation='relu'))
 		model_reg.add(layers.Dense(8, activation='relu'))
-		model_reg.add(layers.BatchNormalization())
-		model_reg.add(layers.Dropout(0.5))
-		model_reg.add(layers.Dense(1, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+		# model_reg.add(layers.BatchNormalization())
+		# model_reg.add(layers.Dropout(0.5))
+		model_reg.add(layers.Dense(1, activation='relu'))
 
 		# print(model_reg.summary())
 		model_reg.compile(loss=tf.keras.losses.mean_squared_error, 
@@ -320,16 +321,7 @@ def regression(models):
 		all_val_true.append(y_val)
 		fold+=1
 
-	print('Train Scores ', train_scores)
-	print('Train mean', np.mean(train_scores))
-	print('Train std', np.std(train_scores))
 	print()
-
-	print('Val accuracies ', val_scores)
-	print('Val mean', np.mean(val_scores))
-	print('Val std', np.std(val_scores))
-	print()
-
 	print('################### TRAIN VALUES ###################')
 	for f in range(n_split):
 		print()
@@ -346,6 +338,16 @@ def regression(models):
 		print('True Values \t Predicted Values')
 		for i in range(all_val_true[f].shape[0]):
 			print(all_val_true[f][i], '\t\t', all_val_predictions[f][i,0])
+
+	print()
+	print('Train Scores ', train_scores)
+	print('Train mean', np.mean(train_scores))
+	print('Train std', np.std(train_scores))
+	
+	print()
+	print('Val accuracies ', val_scores)
+	print('Val mean', np.mean(val_scores))
+	print('Val std', np.std(val_scores))
 
 	# print('Train True values')
 	# print(all_train_true)
