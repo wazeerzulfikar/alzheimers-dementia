@@ -8,6 +8,7 @@ import os
 import numpy as np
 import time
 import re
+import math
 
 import audio_length
 
@@ -307,10 +308,10 @@ def regression(models):
 
 		model_reg = tf.keras.models.load_model('best_model_reg_{}.h5'.format(fold))
 		# models.append(model)
-		train_score = model_reg.evaluate(x_train, y_train, verbose=0)
+		train_score = math.sqrt(model_reg.evaluate(x_train, y_train, verbose=0))
 		train_scores.append(train_score)
-		score = model_reg.evaluate(x_val, y_val, verbose=0)
-		val_scores.append(score)
+		val_score = math.sqrt(model_reg.evaluate(x_val, y_val, verbose=0))
+		val_scores.append(val_score)
 		train_predictions = model_reg.predict(x_train)
 		all_train_predictions.append(train_predictions)
 		val_predictions = model_reg.predict(x_val)
