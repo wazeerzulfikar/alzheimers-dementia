@@ -23,7 +23,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import numpy as np
-np.random.seed(42)
+np.random.seed(0)
 
 import cv2
 from sklearn.model_selection import KFold
