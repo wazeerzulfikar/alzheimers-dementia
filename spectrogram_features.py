@@ -23,6 +23,8 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import numpy as np
+np.random.seed(42)
+
 import cv2
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import OneHotEncoder
@@ -44,11 +46,13 @@ y_cd[:,1] = 1
 
 X = np.concatenate((X_cc, X_cd), axis=0).astype(np.float32)
 y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+filenames = np.concatenate((cc_files, cd_files), axis=0)
 
-np.random.seed(0)
 p = np.random.permutation(len(X))
 X = X[p]
 y = y[p]
+filenames = filenames[p]
+
 X_shape = X.shape
 
 inp_shape = X_cc[0].shape
@@ -118,14 +122,11 @@ class DataGenerator():
 				# x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
 				batch_n += 1
 				original = x_batch_spectograms
-				# x_batch_spectograms = spectogram_augmentation.augment_pitch_and_tempo(x_batch_spectograms)
-				# x_batch_spectograms = spectogram_augmentation.augment_freq_time_mask(x_batch_spectograms)
-				# for i in range(len(np.array(x_batch_spectograms))):
-				# i=0
-				# cv2.imwrite('sample_images/{}_orig.jpg'.format(batch_n), np.array(original[i])*255.)
-				# cv2.imwrite('sample_images/{}_crop.jpg'.format(batch_n), np.array(x_batch_spectograms[i])*255.)
-				# x_batch_spectograms = self.random_crop(x_batch_spectograms)
-				# exit()
+
+				# if np.random.random()<0.4:
+				# 	x_batch_spectograms = spectogram_augmentation.augment_pitch_and_tempo(x_batch_spectograms)
+				# if np.random.random()<0.4:
+				# 	x_batch_spectograms = spectogram_augmentation.augment_freq_time_mask(x_batch_spectograms)
 				yield (x_batch_spectograms, y_batch)
 
 	def on_epoch_end():
@@ -138,41 +139,41 @@ def create_model(_type_ = 'convolutional'):
 
 		model = tf.keras.Sequential()
 		model.add(layers.Input(inp_shape))
-		model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
-						 activation='relu'))
+		# model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
 		model.add(layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu'))
+		# model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
 		model.add(layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu'))
+		# model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
 		model.add(layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu'))
+		# model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
 		model.add(layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu'))
+		# model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
 		model.add(layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2),
 						 activation='relu'))
 		model.add(layers.BatchNormalization())
 
-		model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu'))
-		model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2),
-						 activation='relu'))
-		model.add(layers.BatchNormalization())
+		# model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1),
+		# 				 activation='relu'))
+		# model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2),
+		# 				 activation='relu'))
+		# model.add(layers.BatchNormalization())
 
 		# model.add(layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2),
 		# 				 activation='relu'))
@@ -180,11 +181,58 @@ def create_model(_type_ = 'convolutional'):
 
 		# model.add(layers.Flatten())
 		# model.add(layers.Dropout(0.5)) # 0.5
-		# model.add(layers.Dense(128, activation='relu'))
-		# model.add(layers.Dropout(0.5))
-		model.add(layers.Conv2D(num_classes, kernel_size=(1,1)))
 		model.add(layers.GlobalAveragePooling2D())
-		model.add(layers.Activation('softmax'))
+		model.add(layers.Dropout(0.5)) # 0.5
+		model.add(layers.Dense(128, activation='relu'))
+		model.add(layers.Dropout(0.5))
+		model.add(layers.Dense(num_classes, activation='softmax'))
+
+		# model.add(layers.Conv2D(num_classes, kernel_size=(1,1)))
+		# model.add(layers.Activation('softmax'))
+
+	if _type_=='convolutional_1':
+
+		input_shape_ = (480, 640, 3)
+		model2_input = layers.Input(shape=input_shape_,  name='spectrogram_input')
+		model2_BN = layers.BatchNormalization()(model2_input)
+		
+		model2_hidden1 = layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
+							 activation='relu')(model2_BN)
+		# model2_hidden2 = layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden1)
+		model2_BN1 = layers.BatchNormalization()(model2_hidden1)
+		model2_hidden2 = layers.MaxPool2D()(model2_BN1)
+		
+		model2_hidden3 = layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+							 activation='relu')(model2_hidden2)
+		# model2_hidden4 = layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden3)
+		model2_BN2 = layers.BatchNormalization()(model2_hidden3)
+		model2_hidden4 = layers.MaxPool2D()(model2_BN2)
+
+		model2_hidden5 = layers.Conv2D(64, kernel_size=(5, 5), strides=(1, 1),
+							 activation='relu')(model2_hidden4)
+		# model2_hidden6 = layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden5)
+		model2_BN3 = layers.BatchNormalization()(model2_hidden5)
+		model2_hidden6 = layers.MaxPool2D()(model2_BN3)
+
+		model2_hidden7 = layers.Conv2D(128, kernel_size=(5, 5), strides=(1, 1),
+							 activation='relu')(model2_hidden6)
+		# model2_hidden8 = layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden7)
+		model2_BN4 = layers.BatchNormalization()(model2_hidden7)
+		model2_hidden8 = layers.MaxPool2D()(model2_BN4)
+
+		model2_hidden9 = layers.Flatten()(model2_hidden8)
+		# model2_hidden10 = layers.Dropout(0.2)(model2_hidden9)
+		model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
+		model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
+		model2_hidden11 = layers.Dropout(0.2)(model2_hidden11)
+
+		output = layers.Dense(num_classes, activation='softmax')(model2_hidden11)
+
+		return tf.keras.models.Model(inputs=model2_input,outputs=output)
 
 	if _type_=='recurrent':
 
@@ -290,6 +338,7 @@ def create_model(_type_ = 'convolutional'):
 
 
 model = create_model(_type_='old')
+
 print(model.summary())
 print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
@@ -309,6 +358,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 
 	x_train, x_val = X[train_index], X[val_index]
 	y_train, y_val = y[train_index], y[val_index]
+	filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
 	model = create_model(_type_='old')
 
@@ -334,7 +384,18 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  callbacks=[checkpointer],
 			  validation_data=(x_val, y_val))
 	model = tf.keras.models.load_model('best_model_spec_{}.h5'.format(fold))
+
+	print('_'*30)
+	model = tf.keras.models.load_model('best_model.h5')
+
+	val_pred = model.predict(x_val)
+	for i in range(len(x_val)):
+		print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
+
 	train_score = model.evaluate(x_train, y_train, verbose=0)
+	# print('_'*30)
+	# print(model.predict(x_train))
+	# print(model.predict(x_val))
 
 	train_accuracies.append(train_score[1])
 	score = model.evaluate(x_val, y_val, verbose=0)
@@ -350,3 +411,4 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	print('Val std', np.std(val_accuracies))
 
 	fold+=1
+

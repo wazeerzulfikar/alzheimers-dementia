@@ -6,6 +6,8 @@ The thresholds are looped over 1 to 9 to find best one.
 import glob
 import os
 import numpy as np
+np.random.seed(42)
+
 import time
 import re
 import math
@@ -20,241 +22,242 @@ from sklearn.model_selection import KFold
 from sklearn import preprocessing
 
 def clean_file(lines):
-	return re.sub(r'[0-9]+[_][0-9]+', '', lines.replace("*INV:", "").replace("*PAR:", "")).strip().replace("\x15", "").replace("\n", "").replace("\t", " ").replace("[+ ", "[+").replace("[* ", "[*").replace("[: ", "[:").replace(" .", "").replace("'s", "").replace(" ?", "").replace(" !", "").replace(" ]", "]").lower()
+  return re.sub(r'[0-9]+[_][0-9]+', '', lines.replace("*INV:", "").replace("*PAR:", "")).strip().replace("\x15", "").replace("\n", "").replace("\t", " ").replace("[+ ", "[+").replace("[* ", "[*").replace("[: ", "[:").replace(" .", "").replace("'s", "").replace(" ?", "").replace(" !", "").replace(" ]", "]").lower()
 
 def extra_clean(lines):
-	lines = clean_file(lines)
-	lines = lines.replace("[+exc]", "")
-	lines = lines.replace("[+gram]", "")
-	lines = lines.replace("[+es]", "")
-	lines = re.sub(r'[&][=]*[a-z]+', '', lines) #remove all &=text
-	lines = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', lines) #remove all [*char:char(s)]
-	lines = re.sub(r'[^A-Za-z0-9\s_]+', '', lines) #remove all remaining symbols except underscore
-	lines = re.sub(r'[_]', ' ', lines) #replace underscore with space
-	return lines
+  lines = clean_file(lines)
+  lines = lines.replace("[+exc]", "")
+  lines = lines.replace("[+gram]", "")
+  lines = lines.replace("[+es]", "")
+  lines = re.sub(r'[&][=]*[a-z]+', '', lines) #remove all &=text
+  lines = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', lines) #remove all [*char:char(s)]
+  lines = re.sub(r'[^A-Za-z0-9\s_]+', '', lines) #remove all remaining symbols except underscore
+  lines = re.sub(r'[_]', ' ', lines) #replace underscore with space
+  return lines
 
 def words_count(content):
-	extra_cleaned = extra_clean(content).split(" ")
-	return len(extra_cleaned) - extra_cleaned.count('')
+  extra_cleaned = extra_clean(content).split(" ")
+  return len(extra_cleaned) - extra_cleaned.count('')
 
 def get_pauses_cnt(file):
-	cnt = 0
-	pauses_list = []
-	pauses = re.findall(r'&[a-z]+', file) #find all utterances
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  cnt = 0
+  pauses_list = []
+  pauses = re.findall(r'&[a-z]+', file) #find all utterances
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'<[a-z_\s]+>', file) #find all <text>
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'<[a-z_\s]+>', file) #find all <text>
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'\[/+\]', file) #find all [/+]
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'\[/+\]', file) #find all [/+]
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'\([\.]+\)', file) #find all (.*)
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'\([\.]+\)', file) #find all (.*)
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'\+[\.]+', file) #find all +...
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'\+[\.]+', file) #find all +...
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'[m]*hm', file) #find all mhm or hm
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'[m]*hm', file) #find all mhm or hm
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'\[:[a-z_\s]+\]', file) #find all [:word]
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'\[:[a-z_\s]+\]', file) #find all [:word]
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	pauses = re.findall(r'[a-z]*\([a-z]+\)[a-z]*', file) #find all wor(d)
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  pauses = re.findall(r'[a-z]*\([a-z]+\)[a-z]*', file) #find all wor(d)
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	temp = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', file)
-	pauses = re.findall(r'[a-z]+:[a-z]+', temp) #find all w:ord
-	cnt += len(pauses)
-	pauses_list.append(len(pauses))
+  temp = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', file)
+  pauses = re.findall(r'[a-z]+:[a-z]+', temp) #find all w:ord
+  cnt += len(pauses)
+  pauses_list.append(len(pauses))
 
-	# print(pauses_list)
-	return pauses_list
+  # print(pauses_list)
+  return pauses_list
 
 def prepare_data():
-	dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
-	files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
-	all_pause_counts_cc = []
-	all_inv_counts_cc = []
-	all_word_counts_cc = []
-	for filename in files:
-		inv_count = 0
-		with open(filename, 'r') as f:
-			content = f.read()
-			words_counter = words_count(content)
-			clean_content = clean_file(content)
-			pause_count = get_pauses_cnt(clean_content) # list    
-			content = content.split('\n')
-			speaker_cc = []
+  dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
+  cc_files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
+  all_pause_counts_cc = []
+  all_inv_counts_cc = []
+  all_word_counts_cc = []
+  for filename in cc_files:
+    inv_count = 0
+    with open(filename, 'r') as f:
+      content = f.read()
+      words_counter = words_count(content)
+      clean_content = clean_file(content)
+      pause_count = get_pauses_cnt(clean_content) # list    
+      content = content.split('\n')
+      speaker_cc = []
 
-			for c in content:
-				if 'INV' in c:
-					speaker_cc.append('INV')
-				if 'PAR' in c:
-					speaker_cc.append('PAR')
-			
-			PAR_first_index = speaker_cc.index('PAR')
-			PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1 
-			speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
-			inv_count = speaker_cc.count('INV') # number
-		all_word_counts_cc.append([words_counter/50])
-		all_inv_counts_cc.append([inv_count])
-		all_pause_counts_cc.append(pause_count)
-		# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
+      for c in content:
+        if 'INV' in c:
+          speaker_cc.append('INV')
+        if 'PAR' in c:
+          speaker_cc.append('PAR')
+      
+      PAR_first_index = speaker_cc.index('PAR')
+      PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1 
+      speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
+      inv_count = speaker_cc.count('INV') # number
+    all_word_counts_cc.append([words_counter/50])
+    all_inv_counts_cc.append([inv_count])
+    all_pause_counts_cc.append(pause_count)
+    # print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
 
-	dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
-	files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
-	all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
-	all_pause_rates_cc, all_inv_rates_cc, all_word_rates_cc = [], [], []
-	for idx, pause_counts in enumerate(all_pause_counts_cc):
-		pause_rates = []
-		for p in pause_counts:
-			pause_rates.append(p/all_audio_lengths_cc[idx][0])
-		all_pause_rates_cc.append(pause_rates)
-	for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
-		all_inv_rates_cc.append([inv[0]/audio[0]])
-	for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
-		all_word_rates_cc.append([w[0]/audio[0]])
+  dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
+  files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
+  all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
+  all_pause_rates_cc, all_inv_rates_cc, all_word_rates_cc = [], [], []
+  for idx, pause_counts in enumerate(all_pause_counts_cc):
+    pause_rates = []
+    for p in pause_counts:
+      pause_rates.append(p/all_audio_lengths_cc[idx][0])
+    all_pause_rates_cc.append(pause_rates)
+  for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
+    all_inv_rates_cc.append([inv[0]/audio[0]])
+  for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
+    all_word_rates_cc.append([w[0]/audio[0]])
 
-	print('-'*100)
+  print('-'*100)
 
-	dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
-	files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
-	all_pause_counts_cd = []
-	all_inv_counts_cd = []
-	all_word_counts_cd = []
-	for filename in files:
-		inv_count = 0
-		with open(filename, 'r') as f:
-			content = f.read()
-			words_counter = words_count(content)
-			clean_content = clean_file(content)
-			pause_count = get_pauses_cnt(clean_content)  
-			content = content.split('\n')
-			speaker_cd = []
+  dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
+  cd_files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
+  all_pause_counts_cd = []
+  all_inv_counts_cd = []
+  all_word_counts_cd = []
+  for filename in cd_files:
+    inv_count = 0
+    with open(filename, 'r') as f:
+      content = f.read()
+      words_counter = words_count(content)
+      clean_content = clean_file(content)
+      pause_count = get_pauses_cnt(clean_content)  
+      content = content.split('\n')
+      speaker_cd = []
 
-			for c in content:
-				if 'INV' in c:
-					speaker_cd.append('INV')
-				if 'PAR' in c:
-					speaker_cd.append('PAR')
-			
-			PAR_first_index = speaker_cd.index('PAR')
-			PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1 
-			speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
-			inv_count = speaker_cd.count('INV')
-		all_word_counts_cd.append([words_counter/50])
-		all_inv_counts_cd.append([inv_count])
-		all_pause_counts_cd.append(pause_count)
-		# print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
+      for c in content:
+        if 'INV' in c:
+          speaker_cd.append('INV')
+        if 'PAR' in c:
+          speaker_cd.append('PAR')
+      
+      PAR_first_index = speaker_cd.index('PAR')
+      PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1 
+      speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
+      inv_count = speaker_cd.count('INV')
+    all_word_counts_cd.append([words_counter/50])
+    all_inv_counts_cd.append([inv_count])
+    all_pause_counts_cd.append(pause_count)
+    # print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
 
-	dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
-	files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
-	all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
-	all_pause_rates_cd, all_inv_rates_cd, all_word_rates_cd = [], [], []
-	for idx, pause_counts in enumerate(all_pause_counts_cd):
-		pause_rates = []
-		for p in pause_counts:
-			pause_rates.append(p/all_audio_lengths_cd[idx][0])
-		all_pause_rates_cd.append(pause_rates)
-	for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
-		all_inv_rates_cd.append([inv[0]/audio[0]])
-	for w, audio in zip(all_word_counts_cd, all_audio_lengths_cd):
-		all_word_rates_cd.append([w[0]/audio[0]])
+  dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
+  files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
+  all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
+  all_pause_rates_cd, all_inv_rates_cd, all_word_rates_cd = [], [], []
+  for idx, pause_counts in enumerate(all_pause_counts_cd):
+    pause_rates = []
+    for p in pause_counts:
+      pause_rates.append(p/all_audio_lengths_cd[idx][0])
+    all_pause_rates_cd.append(pause_rates)
+  for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
+    all_inv_rates_cd.append([inv[0]/audio[0]])
+  for w, audio in zip(all_word_counts_cd, all_audio_lengths_cd):
+    all_word_rates_cd.append([w[0]/audio[0]])
 
-	print('-'*100)
+  print('-'*100)
 
-	# all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
-	# all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
+  # all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
+  # all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
 
-	all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc, all_word_rates_cc), axis=-1)
-	all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd, all_word_rates_cd), axis=-1)
+  all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc, all_word_rates_cc), axis=-1)
+  all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd, all_word_rates_cd), axis=-1)
 
-	# all_counts_cc = preprocessing.normalize(all_counts_cc, axis=0)
-	# all_counts_cd = preprocessing.normalize(all_counts_cd, axis=0)
+  # all_counts_cc = preprocessing.normalize(all_counts_cc, axis=0)
+  # all_counts_cd = preprocessing.normalize(all_counts_cd, axis=0)
 
-	X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
+  X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
-	### Regression y values
-	y_reg_cc = np.zeros((len(all_counts_cc), ))
-	file = open('../ADReSS-IS2020-data/train/cc_meta_data.txt', 'r+')
-	lines = file.readlines()[1:]
-	for idx, line in enumerate(lines):
-		token = line.split('; ')[-1].strip('\n')
-		if token!='NA':		y_reg_cc[idx] = int(token)
-		else:		y_reg_cc[idx] = 30
-		
+  ### Regression y values
+  y_reg_cc = np.zeros((len(all_counts_cc), ))
+  file = open('../ADReSS-IS2020-data/train/cc_meta_data.txt', 'r+')
+  lines = file.readlines()[1:]
+  for idx, line in enumerate(lines):
+    token = line.split('; ')[-1].strip('\n')
+    if token!='NA':   y_reg_cc[idx] = int(token)
+    else:   y_reg_cc[idx] = 30
+    
 
-	y_reg_cd = np.zeros((len(all_counts_cd), ))
-	file = open('../ADReSS-IS2020-data/train/cd_meta_data.txt', 'r+')
-	lines = file.readlines()[1:]
-	for idx, line in enumerate(lines):
-		token = line.split('; ')[-1].strip('\n')
-		y_reg_cd[idx] = int(token)
+  y_reg_cd = np.zeros((len(all_counts_cd), ))
+  file = open('../ADReSS-IS2020-data/train/cd_meta_data.txt', 'r+')
+  lines = file.readlines()[1:]
+  for idx, line in enumerate(lines):
+    token = line.split('; ')[-1].strip('\n')
+    y_reg_cd[idx] = int(token)
 
-	y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
-	#######################
+  y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+  #######################
 
-	### Regression X values
-	X_reg = np.copy(X)
-	#######################
+  ### Regression X values
+  X_reg = np.copy(X)
+  #######################
 
-	### Classification y values
-	y_cc = np.zeros((len(all_counts_cc), 2))
-	y_cc[:,0] = 1
+  ### Classification y values
+  y_cc = np.zeros((len(all_counts_cc), 2))
+  y_cc[:,0] = 1
 
-	y_cd = np.zeros((len(all_counts_cd), 2))
-	y_cd[:,1] = 1
+  y_cd = np.zeros((len(all_counts_cd), 2))
+  y_cd[:,1] = 1
 
-	y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
-	#######################
+  y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+  filenames = np.concatenate((cc_files, cd_files), axis=0)
+  #######################
 
-	np.random.seed(0)
-	p = np.random.permutation(len(X))
-	X, X_reg = X[p], X_reg[p]
-	y, y_reg = y[p], y_reg[p]
+  p = np.random.permutation(len(X))
+  X, X_reg = X[p], X_reg[p]
+  y, y_reg = y[p], y_reg[p]
+  filenames = filenames[p]
 
-	return X, y, X_reg, y_reg
+  return X, y, X_reg, y_reg, filenames
 
 
 def create_model():
-	# model = tf.keras.Sequential()
-	# model.add(layers.Input(shape=(10,)))
-	# model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-	# model.add(layers.Dense(32, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-	# model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-	# model.add(layers.Dropout(0.2))
-	# model.add(layers.Dense(2, activation='softmax'))
-	model = tf.keras.Sequential()
-	model.add(layers.Input(shape=(11,)))
-	# model.add(layers.Dropout(0.2))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dense(16, activation='relu'))
-	# model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-	# model.add(layers.Dense(64, activation='relu'))
-	# model.add(layers.Dense(128, activation='relu'))
-	# model.add(layers.Dense(256, activation='sigmoid'))
-	# model.add(layers.Dense(128, activation='relu'))
-	# model.add(layers.Dense(64, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(32, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(16, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.5))
-	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-	return model
+  # model = tf.keras.Sequential()
+  # model.add(layers.Input(shape=(10,)))
+  # model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+  # model.add(layers.Dense(32, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+  # model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+  # model.add(layers.Dropout(0.2))
+  # model.add(layers.Dense(2, activation='softmax'))
+  model = tf.keras.Sequential()
+  model.add(layers.Input(shape=(11,)))
+  # model.add(layers.Dropout(0.2))
+  model.add(layers.BatchNormalization())
+  model.add(layers.Dense(16, activation='relu'))
+  # model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+  # model.add(layers.Dense(64, activation='relu'))
+  # model.add(layers.Dense(128, activation='relu'))
+  # model.add(layers.Dense(256, activation='sigmoid'))
+  # model.add(layers.Dense(128, activation='relu'))
+  # model.add(layers.Dense(64, activation='relu'))
+  model.add(layers.BatchNormalization())
+  model.add(layers.Dropout(0.5))
+  model.add(layers.Dense(32, activation='relu'))
+  model.add(layers.BatchNormalization())
+  model.add(layers.Dropout(0.5))
+  model.add(layers.Dense(16, activation='relu'))
+  model.add(layers.BatchNormalization())
+  model.add(layers.Dropout(0.5))
+  model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+  return model
 
 def regression_baseline():
 
@@ -380,62 +383,72 @@ def regression(models):
 
 def training():
 
-	n_split = 5
-	epochs = 600
-	batch_size = 8
+  n_split = 5
+  epochs = 600
+  batch_size = 8
 
-	val_accuracies = []
-	train_accuracies = []
+  val_accuracies = []
+  train_accuracies = []
 
-	X, y, _, _ = prepare_data()
-	fold = 0
-	models = []
+  X, y, _, _, filenames = prepare_data()
+  fold = 0
+  models = []
 
-	for train_index, val_index in KFold(n_split).split(X):
+  for train_index, val_index in KFold(n_split).split(X):
 
-		x_train, x_val = X[train_index], X[val_index]
-		y_train, y_val = y[train_index], y[val_index]
+    x_train, x_val = X[train_index], X[val_index]
+    y_train, y_val = y[train_index], y[val_index]
+    filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
-		model = create_model()
 
-		# timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-		# log_name = "{}".format(timeString)
-		# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
+    model = create_model()
 
-		model.compile(loss=tf.keras.losses.categorical_crossentropy,
-									optimizer=tf.keras.optimizers.Adam(lr=0.001),
-									metrics=['categorical_accuracy'])
+    # timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+    # log_name = "{}".format(timeString)
+    # tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
 
-		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-						'best_model_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
-						save_weights_only=False, mode='auto', save_freq='epoch')
+    model.compile(loss=tf.keras.losses.categorical_crossentropy,
+                  optimizer=tf.keras.optimizers.Adam(lr=0.001),
+                  metrics=['categorical_accuracy'])
 
-		model.fit(x_train, y_train,
-							batch_size=batch_size,
-							epochs=epochs,
-							verbose=1,
-							callbacks=[checkpointer],
-							validation_data=(x_val, y_val))
+    checkpointer = tf.keras.callbacks.ModelCheckpoint(
+            'best_model_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+            save_weights_only=False, mode='auto', save_freq='epoch')
 
-		model = tf.keras.models.load_model('best_model_{}.h5'.format(fold))
-		models.append(model)
-		train_score = model.evaluate(x_train, y_train, verbose=0)
+    model.fit(x_train, y_train,
+              batch_size=batch_size,
+              epochs=epochs,
+              verbose=0,
+              callbacks=[checkpointer],
+              validation_data=(x_val, y_val))
 
-		train_accuracies.append(train_score[1])
-		score = model.evaluate(x_val, y_val, verbose=0)
-		print('Val accuracy:', score[1])
-		val_accuracies.append(score[1])
-		fold+=1
+    model = tf.keras.models.load_model('best_model_{}.h5'.format(fold))
+    val_pred = model.predict(x_val)
 
-	print('Train accuracies ', train_accuracies)
-	print('Train mean', np.mean(train_accuracies))
-	print('Train std', np.std(train_accuracies))
+    for i in range(len(x_val)):
+        print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
+    models.append(model)
+    train_score = model.evaluate(x_train, y_train, verbose=0)
 
-	print('Val accuracies ', val_accuracies)
-	print('Val mean', np.mean(val_accuracies))
-	print('Val std', np.std(val_accuracies))
+    train_accuracies.append(train_score[1])
+    score = model.evaluate(x_val, y_val, verbose=0)
+    print('Val accuracy:', score[1])
+    val_accuracies.append(score[1])
+    fold+=1
+    print('Train accuracies ', train_accuracies)
+    print('Train mean', np.mean(train_accuracies))
+    print('Train std', np.std(train_accuracies))
 
-	return models
+    print('Val accuracies ', val_accuracies)
+    print('Val mean', np.mean(val_accuracies))
+    print('Val std', np.std(val_accuracies))
+    # exit()
+
+
+
+
+
+  return models
 
 # models = training()
 
