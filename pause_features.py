@@ -13,6 +13,8 @@ import audio_length
 
 import tensorflow as tf
 from tensorflow.keras import layers
+from tensorflow.keras import backend as K
+
 from sklearn.model_selection import KFold
 from sklearn import preprocessing
 
@@ -253,7 +255,94 @@ def create_model():
 	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 	return model
 
-# def regression(models):
+def regression(models):
+	'''
+	models is a list of loaded models
+	'''
+
+	_, _, X_reg, y_reg = prepare_data()
+	fold = 0
+	n_split = 5
+	epochs = 1000
+	batch_size = 8
+
+	train_scores, val_scores = [], []
+	all_train_predictions, all_val_predictions = [], []
+	all_train_true, all_val_true = [], []
+
+	for train_index, val_index in KFold(n_split).split(X_reg):
+
+		# def root_mean_squared_error(y_true, y_pred):
+		# 	return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
+
+		x_train, x_val = X_reg[train_index], X_reg[val_index]
+		y_train, y_val = y_reg[train_index], y_reg[val_index]
+
+		model = models[fold]
+		model.pop()
+		for layer in model.layers:
+			layer.trainable = False
+
+		model_reg = tf.keras.Sequential()
+		model_reg.add(model)
+		model_reg.add(layers.Dense(8, activation='relu'))
+		model_reg.add(layers.BatchNormalization())
+		model_reg.add(layers.Dropout(0.5))
+		model_reg.add(layers.Dense(1, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+
+		model_reg.compile(loss=tf.keras.losses.mean_squared_error, 
+			optimizer=tf.keras.optimizers.Adam(lr=0.001))
+
+		checkpointer = tf.keras.callbacks.ModelCheckpoint(
+						'best_model_reg_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+						save_weights_only=False, mode='auto', save_freq='epoch')
+
+		model_reg.fit(x_train, y_train,
+							batch_size=batch_size,
+							epochs=epochs,
+							verbose=1,
+							callbacks=[checkpointer],
+							validation_data=(x_val, y_val))
+
+		model_reg = tf.keras.models.load_model('best_model_reg_{}.h5'.format(fold))
+		# models.append(model)
+		train_score = model_reg.evaluate(x_train, y_train, verbose=0)
+		train_scores.append(train_score)
+		score = model_reg.evaluate(x_val, y_val, verbose=0)
+		val_scores.append(score)
+		train_predictions = model_reg.predict(x_train)
+		all_train_predictions.append(train_predictions)
+		val_predictions = model_reg.predict(x_val)
+		all_val_predictions.append(val_predictions)
+		all_train_true.append(y_train)
+		all_val_true.append(y_val)
+		fold+=1
+
+	print('Train Scores ', train_scores)
+	print('Train mean', np.mean(train_scores))
+	print('Train std', np.std(train_scores))
+	print()
+
+	print('Val accuracies ', val_scores)
+	print('Val mean', np.mean(val_scores))
+	print('Val std', np.std(val_scores))
+	print()
+
+	print('Train True values')
+	print(all_train_true)
+	print()
+
+	print('Train predicted values')
+	print(all_train_predictions)
+	print()
+
+	print('Val True values')
+	print(all_val_true)
+	print()
+
+	print('Val predicted values')
+	print(all_val_predictions)
+	print()
 
 
 def training():
@@ -315,8 +404,10 @@ def training():
 
 	return models
 
-models = training()
+# models = training()
+models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
 print(models)
+regression(models)
 
 # thresholds = []
 

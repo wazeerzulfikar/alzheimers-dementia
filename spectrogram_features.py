@@ -4,7 +4,7 @@ Convolutional and recurrent models for AD classification.
 
 
 import tensorflow as tf
-from tensorflow.keras import layers, regularizers
+from tensorflow.keras import layers, regularizers, models
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import Callback, TensorBoard
@@ -33,12 +33,12 @@ import spectogram_augmentation
 dataset_dir = ''
 dataset_dir = '../spectograms/'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
-X_cc = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cc_files])
+X_cc = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cc_files])
 y_cc = np.zeros((X_cc.shape[0], 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-X_cd = np.array([cv2.resize(cv2.imread(f), (320,240))/255. for f in cd_files])
+X_cd = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cd_files])
 y_cd = np.zeros((X_cd.shape[0], 2))
 y_cd[:,1] = 1
 
@@ -118,8 +118,8 @@ class DataGenerator():
 				# x_batch_interventions = self.X_interventions[batch_n:batch_n+batch_size]
 				batch_n += 1
 				original = x_batch_spectograms
-				x_batch_spectograms = spectogram_augmentation.augment_pitch_and_tempo(x_batch_spectograms)
-				x_batch_spectograms = spectogram_augmentation.augment_freq_time_mask(x_batch_spectograms)
+				# x_batch_spectograms = spectogram_augmentation.augment_pitch_and_tempo(x_batch_spectograms)
+				# x_batch_spectograms = spectogram_augmentation.augment_freq_time_mask(x_batch_spectograms)
 				# for i in range(len(np.array(x_batch_spectograms))):
 				# i=0
 				# cv2.imwrite('sample_images/{}_orig.jpg'.format(batch_n), np.array(original[i])*255.)
@@ -209,6 +209,48 @@ def create_model(_type_ = 'convolutional'):
 		model.add(layers.Dense(num_classes, kernel_regularizer=regularizers.l2(0.1),
 				activity_regularizer=regularizers.l1(0.1), activation='softmax'))
 
+	if _type_=='old':
+		input_shape_ = (480, 640, 3)
+		model2_input = layers.Input(shape=input_shape_,  name='spectrogram_input')
+		model2_BN = layers.BatchNormalization()(model2_input)
+		
+		model2_hidden1 = layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
+							 activation='relu')(model2_BN)
+		# model2_hidden2 = layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden1)
+		model2_BN1 = layers.BatchNormalization()(model2_hidden1)
+		model2_hidden2 = layers.MaxPool2D()(model2_BN1)
+		
+		model2_hidden3 = layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+							 activation='relu')(model2_hidden2)
+		# model2_hidden4 = layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden3)
+		model2_BN2 = layers.BatchNormalization()(model2_hidden3)
+		model2_hidden4 = layers.MaxPool2D()(model2_BN2)
+
+		model2_hidden5 = layers.Conv2D(64, kernel_size=(5, 5), strides=(1, 1),
+							 activation='relu')(model2_hidden4)
+		# model2_hidden6 = layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden5)
+		model2_BN3 = layers.BatchNormalization()(model2_hidden5)
+		model2_hidden6 = layers.MaxPool2D()(model2_BN3)
+
+		model2_hidden7 = layers.Conv2D(128, kernel_size=(5, 5), strides=(1, 1),
+							 activation='relu')(model2_hidden6)
+		# model2_hidden8 = layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+		# 					 activation='relu')(model2_hidden7)
+		model2_BN4 = layers.BatchNormalization()(model2_hidden7)
+		model2_hidden8 = layers.MaxPool2D()(model2_BN4)
+
+		model2_hidden9 = layers.Flatten()(model2_hidden8)
+		# model2_hidden10 = layers.Dropout(0.2)(model2_hidden9)
+		model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
+		model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
+		model2_output = layers.Dropout(0.2)(model2_hidden11)
+		model2_output = layers.Dense(num_classes, activation='softmax')(model2_output)
+
+		model = models.Model(model2_input, model2_output)
+
 	# if _type_=='self-attention':
 
 	# 	print((X_cc[0].shape[1], X_cc[0].shape[0], X_cc[0].shape[2]))
@@ -247,7 +289,7 @@ def create_model(_type_ = 'convolutional'):
 	return model
 
 
-model = create_model(_type_='convolutional')
+model = create_model(_type_='old')
 print(model.summary())
 print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
@@ -267,7 +309,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	x_train, x_val = X[train_index], X[val_index]
 	y_train, y_val = y[train_index], y[val_index]
 
-	model = create_model(_type_='convolutional')
+	model = create_model(_type_='old')
 
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
@@ -289,7 +331,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  steps_per_epoch=datagen.get_n_batches(),
 			  verbose=1,
 			  callbacks=[checkpointer],
-			  validation_data=( x_val, y_val))
+			  validation_data=(x_val, y_val))
 	model = tf.keras.models.load_model('best_model.h5')
 	train_score = model.evaluate(x_train, y_train, verbose=0)
 
