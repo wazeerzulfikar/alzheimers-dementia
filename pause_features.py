@@ -187,25 +187,22 @@ def prepare_data():
 	lines = file.readlines()[1:]
 	for idx, line in enumerate(lines):
 		token = line.split('; ')[-1].strip('\n')
-		if token!='NA':		token = int(token)
-		else:	token = -1
-		y_reg_cc[idx] = token
+		if token!='NA':		y_reg_cc[idx] = int(token)
+		else:		y_reg_cc[idx] = 30
+		
 
 	y_reg_cd = np.zeros((len(all_counts_cd), ))
 	file = open('../ADReSS-IS2020-data/train/cd_meta_data.txt', 'r+')
 	lines = file.readlines()[1:]
 	for idx, line in enumerate(lines):
 		token = line.split('; ')[-1].strip('\n')
-		if token!='NA':		token = int(token)
-		else:	token = -1
-		y_reg_cd[idx] = token
+		y_reg_cd[idx] = int(token)
 
 	y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 	#######################
 
 	### Regression X values
-	to_exclude = np.argwhere(y_reg==-1)
-	X_reg = np.delete(X, to_exclude, 0).astype(np.float32)
+	X_reg = np.copy(X)
 	#######################
 
 	### Classification y values
@@ -220,9 +217,8 @@ def prepare_data():
 
 	np.random.seed(0)
 	p = np.random.permutation(len(X))
-	p_reg = np.random.permutation(len(X_reg))
-	X, X_reg = X[p], X_reg[p_reg]
-	y, y_reg = y[p], y_reg[p_reg]
+	X, X_reg = X[p], X_reg[p]
+	y, y_reg = y[p], y_reg[p]
 
 	return X, y, X_reg, y_reg
 
@@ -257,6 +253,9 @@ def create_model():
 	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 	return model
 
+# def regression(models):
+
+
 def training():
 
 	n_split = 5
@@ -268,6 +267,7 @@ def training():
 
 	X, y, _, _ = prepare_data()
 	fold = 0
+	models = []
 
 	for train_index, val_index in KFold(n_split).split(X):
 
@@ -296,6 +296,7 @@ def training():
 							validation_data=(x_val, y_val))
 
 		model = tf.keras.models.load_model('best_model_{}.h5'.format(fold))
+		models.append(model)
 		train_score = model.evaluate(x_train, y_train, verbose=0)
 
 		train_accuracies.append(train_score[1])
@@ -312,7 +313,10 @@ def training():
 	print('Val mean', np.mean(val_accuracies))
 	print('Val std', np.std(val_accuracies))
 
-training()
+	return models
+
+models = training()
+print(models)
 
 # thresholds = []
 
