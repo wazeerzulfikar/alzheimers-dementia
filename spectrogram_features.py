@@ -375,7 +375,7 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	datagen = DataGenerator(x_train, y_train, batch_size)
 
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model_spec_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
+            'best_model_spec_2_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
             save_weights_only=False, mode='auto', save_freq='epoch'
         )
 	model.fit(datagen.flow(),
@@ -384,10 +384,9 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 			  verbose=1,
 			  callbacks=[checkpointer],
 			  validation_data=(x_val, y_val))
-	model = tf.keras.models.load_model('best_model_spec_{}.h5'.format(fold))
+	model = tf.keras.models.load_model('best_model_spec_2_{}.h5'.format(fold))
 
 	print('_'*30)
-	model = tf.keras.models.load_model('best_model.h5')
 
 	val_pred = model.predict(x_val)
 	for i in range(len(x_val)):

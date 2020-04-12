@@ -143,13 +143,13 @@ def regression(models):
 
 		model = models[fold]
 		model.pop()
-		for layer in model.layers:
-			layer.trainable = False
+		# for layer in model.layers:
+		# 	layer.trainable = False
 
 		model_reg = tf.keras.Sequential()
 		model_reg.add(model)
 		model_reg.add(layers.Dense(16, activation='relu'))
-		model_reg.add(layers.Dense(8, activation='relu'))
+		model_reg.add(layers.Dense(16, activation='relu'))
 		# model_reg.add(layers.BatchNormalization())
 		# model_reg.add(layers.Dropout(0.5))
 		model_reg.add(layers.Dense(1, activation='relu'))
@@ -283,9 +283,9 @@ def training():
 
 models = training()
 
-# models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
-# print(models)
-# regression(models)
+models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
+print(models)
+regression(models)
 
 # regression_baseline()
 
