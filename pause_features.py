@@ -21,187 +21,34 @@ from tensorflow.keras import backend as K
 from sklearn.model_selection import KFold
 from sklearn import preprocessing
 
-def clean_file(lines):
-  return re.sub(r'[0-9]+[_][0-9]+', '', lines.replace("*INV:", "").replace("*PAR:", "")).strip().replace("\x15", "").replace("\n", "").replace("\t", " ").replace("[+ ", "[+").replace("[* ", "[*").replace("[: ", "[:").replace(" .", "").replace("'s", "").replace(" ?", "").replace(" !", "").replace(" ]", "]").lower()
-
-def extra_clean(lines):
-  lines = clean_file(lines)
-  lines = lines.replace("[+exc]", "")
-  lines = lines.replace("[+gram]", "")
-  lines = lines.replace("[+es]", "")
-  lines = re.sub(r'[&][=]*[a-z]+', '', lines) #remove all &=text
-  lines = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', lines) #remove all [*char:char(s)]
-  lines = re.sub(r'[^A-Za-z0-9\s_]+', '', lines) #remove all remaining symbols except underscore
-  lines = re.sub(r'[_]', ' ', lines) #replace underscore with space
-  return lines
-
-def words_count(content):
-  extra_cleaned = extra_clean(content).split(" ")
-  return len(extra_cleaned) - extra_cleaned.count('')
-
-def get_pauses_cnt(file):
-  cnt = 0
-  pauses_list = []
-  pauses = re.findall(r'&[a-z]+', file) #find all utterances
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'<[a-z_\s]+>', file) #find all <text>
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'\[/+\]', file) #find all [/+]
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'\([\.]+\)', file) #find all (.*)
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'\+[\.]+', file) #find all +...
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'[m]*hm', file) #find all mhm or hm
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'\[:[a-z_\s]+\]', file) #find all [:word]
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  pauses = re.findall(r'[a-z]*\([a-z]+\)[a-z]*', file) #find all wor(d)
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  temp = re.sub(r'\[[*][a-z]:[a-z][-|a-z]*\]', '', file)
-  pauses = re.findall(r'[a-z]+:[a-z]+', temp) #find all w:ord
-  cnt += len(pauses)
-  pauses_list.append(len(pauses))
-
-  # print(pauses_list)
-  return pauses_list
+import dataset_features
+import dataset_utils
 
 def prepare_data():
-  dataset_dir = '../ADReSS-IS2020-data/train/transcription/cc/'
-  cc_files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
-  all_pause_counts_cc = []
-  all_inv_counts_cc = []
-  all_word_counts_cc = []
-  for filename in cc_files:
-    inv_count = 0
-    with open(filename, 'r') as f:
-      content = f.read()
-      words_counter = words_count(content)
-      clean_content = clean_file(content)
-      pause_count = get_pauses_cnt(clean_content) # list    
-      content = content.split('\n')
-      speaker_cc = []
+  dataset_dir = '../ADReSS-IS2020-data/train'
 
-      for c in content:
-        if 'INV' in c:
-          speaker_cc.append('INV')
-        if 'PAR' in c:
-          speaker_cc.append('PAR')
-      
-      PAR_first_index = speaker_cc.index('PAR')
-      PAR_last_index = len(speaker_cc) - speaker_cc[::-1].index('PAR') - 1 
-      speaker_cc = speaker_cc[PAR_first_index:PAR_last_index]
-      inv_count = speaker_cc.count('INV') # number
-    all_word_counts_cc.append([words_counter/50])
-    all_inv_counts_cc.append([inv_count])
-    all_pause_counts_cc.append(pause_count)
-    # print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
+  cc_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
+  cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')))
 
-  dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/'
-  files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
-  all_audio_lengths_cc = [[i/10] for i in audio_length.audio_length(files)]
-  all_pause_rates_cc, all_inv_rates_cc, all_word_rates_cc = [], [], []
-  for idx, pause_counts in enumerate(all_pause_counts_cc):
-    pause_rates = []
-    for p in pause_counts:
-      pause_rates.append(p/all_audio_lengths_cc[idx][0])
-    all_pause_rates_cc.append(pause_rates)
-  for inv, audio in zip(all_inv_counts_cc, all_audio_lengths_cc):
-    all_inv_rates_cc.append([inv[0]/audio[0]])
-  for w, audio in zip(all_word_counts_cc, all_audio_lengths_cc):
-    all_word_rates_cc.append([w[0]/audio[0]])
+  all_counts_cc = []
+  for t_f, a_f in zip(cc_transcription_files, cc_audio_files):
+    pause_features = dataset_features.get_pause_features(t_f, a_f)
+    all_counts_cc.append(pause_features)
 
-  print('-'*100)
 
-  dataset_dir = '../ADReSS-IS2020-data/train/transcription/cd/'
-  cd_files = sorted(glob.glob(os.path.join(dataset_dir, '*.cha')))
-  all_pause_counts_cd = []
-  all_inv_counts_cd = []
-  all_word_counts_cd = []
-  for filename in cd_files:
-    inv_count = 0
-    with open(filename, 'r') as f:
-      content = f.read()
-      words_counter = words_count(content)
-      clean_content = clean_file(content)
-      pause_count = get_pauses_cnt(clean_content)  
-      content = content.split('\n')
-      speaker_cd = []
+  cd_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
+  cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
 
-      for c in content:
-        if 'INV' in c:
-          speaker_cd.append('INV')
-        if 'PAR' in c:
-          speaker_cd.append('PAR')
-      
-      PAR_first_index = speaker_cd.index('PAR')
-      PAR_last_index = len(speaker_cd) - speaker_cd[::-1].index('PAR') - 1 
-      speaker_cd = speaker_cd[PAR_first_index:PAR_last_index]
-      inv_count = speaker_cd.count('INV')
-    all_word_counts_cd.append([words_counter/50])
-    all_inv_counts_cd.append([inv_count])
-    all_pause_counts_cd.append(pause_count)
-    # print('{} has {} INVs'.format(filename.split('/')[-1], inv_count))
-
-  dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cd/'
-  files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
-  all_audio_lengths_cd = [[i/10] for i in audio_length.audio_length(files)]
-  all_pause_rates_cd, all_inv_rates_cd, all_word_rates_cd = [], [], []
-  for idx, pause_counts in enumerate(all_pause_counts_cd):
-    pause_rates = []
-    for p in pause_counts:
-      pause_rates.append(p/all_audio_lengths_cd[idx][0])
-    all_pause_rates_cd.append(pause_rates)
-  for inv, audio in zip(all_inv_counts_cd, all_audio_lengths_cd):
-    all_inv_rates_cd.append([inv[0]/audio[0]])
-  for w, audio in zip(all_word_counts_cd, all_audio_lengths_cd):
-    all_word_rates_cd.append([w[0]/audio[0]])
-
-  print('-'*100)
-
-  # all_counts_cc = np.concatenate((all_inv_counts_cc, all_pause_counts_cc), axis=-1)
-  # all_counts_cd = np.concatenate((all_inv_counts_cd, all_pause_counts_cd), axis=-1)
-
-  all_counts_cc = np.concatenate((all_inv_rates_cc, all_pause_rates_cc, all_word_rates_cc), axis=-1)
-  all_counts_cd = np.concatenate((all_inv_rates_cd, all_pause_rates_cd, all_word_rates_cd), axis=-1)
-
-  # all_counts_cc = preprocessing.normalize(all_counts_cc, axis=0)
-  # all_counts_cd = preprocessing.normalize(all_counts_cd, axis=0)
+  all_counts_cd = [] 
+  for t_f, a_f in zip(cd_transcription_files, cd_audio_files):
+    pause_features = dataset_features.get_pause_features(t_f, a_f)
+    all_counts_cd.append(pause_features)
 
   X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
   ### Regression y values
-  y_reg_cc = np.zeros((len(all_counts_cc), ))
-  file = open('../ADReSS-IS2020-data/train/cc_meta_data.txt', 'r+')
-  lines = file.readlines()[1:]
-  for idx, line in enumerate(lines):
-    token = line.split('; ')[-1].strip('\n')
-    if token!='NA':   y_reg_cc[idx] = int(token)
-    else:   y_reg_cc[idx] = 30
-    
-
-  y_reg_cd = np.zeros((len(all_counts_cd), ))
-  file = open('../ADReSS-IS2020-data/train/cd_meta_data.txt', 'r+')
-  lines = file.readlines()[1:]
-  for idx, line in enumerate(lines):
-    token = line.split('; ')[-1].strip('\n')
-    y_reg_cd[idx] = int(token)
+  y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+  y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
   y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
   #######################
@@ -218,7 +65,7 @@ def prepare_data():
   y_cd[:,1] = 1
 
   y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
-  filenames = np.concatenate((cc_files, cd_files), axis=0)
+  filenames = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
   #######################
 
   p = np.random.permutation(len(X))
@@ -276,7 +123,7 @@ def regression(models):
 	models is a list of loaded models
 	'''
 
-	_, _, X_reg, y_reg = prepare_data()
+	_, _, X_reg, y_reg, _ = prepare_data()
 	fold = 0
 	n_split = 5
 	epochs = 1500
@@ -364,22 +211,6 @@ def regression(models):
 	print('Val mean', np.mean(val_scores))
 	print('Val std', np.std(val_scores))
 
-	# print('Train True values')
-	# print(all_train_true)
-	# print()
-
-	# print('Train predicted values')
-	# print(all_train_predictions)
-	# print()
-
-	# print('Val True values')
-	# print(all_val_true)
-	# print()
-
-	# print('Val predicted values')
-	# print(all_val_predictions)
-	# print()
-
 
 def training():
 
@@ -418,7 +249,7 @@ def training():
     model.fit(x_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
-              verbose=0,
+              verbose=1,
               callbacks=[checkpointer],
               validation_data=(x_val, y_val))
 
@@ -450,13 +281,13 @@ def training():
 
   return models
 
-# models = training()
+models = training()
 
 # models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
 # print(models)
 # regression(models)
 
-regression_baseline()
+# regression_baseline()
 
 
 

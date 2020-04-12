@@ -30,17 +30,18 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import OneHotEncoder
 
 import spectogram_augmentation
+import dataset_features
 
 
 dataset_dir = ''
 dataset_dir = '../spectograms/'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
-X_cc = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cc_files])
+X_cc = np.array([dataset_features.get_spectogram_features(f) for f in cc_files])
 y_cc = np.zeros((X_cc.shape[0], 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-X_cd = np.array([cv2.resize(cv2.imread(f), (640,480))/255. for f in cd_files])
+X_cd = np.array([dataset_features.get_spectogram_features(f) for f in cd_files])
 y_cd = np.zeros((X_cd.shape[0], 2))
 y_cd[:,1] = 1
 
