@@ -1,44 +1,140 @@
+import os
+import glob
+
 import tensorflow as tf
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 import numpy as np
+np.random.seed(0)
 
 # Local imports
-import pause_features
-import spectrogram_features
-import intervention_features
+import dataset_features
 
-X1, y1, _, _ = pause_features.prepare_data
+print('Loading data...')
+audio_length_normalization = 10
+spectrogram_size = (480, 640)
+longest_speaker_length = 32
 
-def majority_voting(X1, X2, X3, y, models):
-	'''
-	X1 is the X of pause_features
-	X2 is the X of spectrograms
-	X3 is the X of interventions
-	y is the labels
-	models is a list of strings - names of best models from all 3 kinds of models = [best_model_pause_features_0, best_model_spectrograms_0, best_model_interventions_0, .. , best_model_pause_features_4, best_model_spectrograms_4, best_model_interventions_4]
-	
-	Returns a list of accuracies over all folds
-	'''
+dataset_dir = '../ADReSS-IS2020-data/train'
+cc_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
+cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')))
+cc_spectogram_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cc/*.png')))
 
-	models = list(map(lambda x: tf.keras.models.load_model(x), models))
+cc_pause_features, cc_spectogram_features, cc_invervention_features = [], [], []
+for i in range(len(cc_transcription_files)):
+	cc_pause_features.append(dataset_features.get_pause_features(
+		transcription_filename=cc_transcription_files[i], 
+		audio_filename=cc_audio_files[i], 
+		audio_length_normalization=audio_length_normalization))
 
-	fold = 0
-	all_accuracies = []
-	for _, val_index in KFold(n_split).split(X):
-		x_val, y_val = X[val_index], y[val_index]
-		probs = list(map(lambda x: x.predict(x_val), models[fold*3, (fold+1)*3]))
-		all_predictions = list(map(lambda x: np.argmax(x, axis=-1), probs))
-		y_pred = []
-		for i in range(all_predictions[0].shape[0]): # iteration over all validation samples
-			model_predictions = [all_predictions[0][i], all_predictions[1][i], all_predictions[2][i]]
-			predictions, counts = np.unique(np.array(model_predictions), return_counts=True)
-			voted_prediction = predictions[np.argmax(counts)]
-			y_pred.append(voted_prediction)
-		y_pred = np.array(y_pred)
-		accuracy = accuracy_score(y_val, y_pred)
-		all_accuracies.append(accuracy)
-		fold+=1
+	cc_spectogram_features.append(dataset_features.get_spectogram_features(
+		spectogram_filename=cc_spectogram_files[i], 
+		output_size=spectrogram_size[::-1]))
 
-	return all_accuracies
+	cc_invervention_features.append(dataset_features.get_intervention_features(
+		transcription_filename=cc_transcription_files[i],
+		max_length=longest_speaker_length))
+
+cd_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
+cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
+cd_spectogram_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cd/*.png')))
+
+cd_pause_features, cd_spectogram_features, cd_invervention_features = [], [], []
+for i in range(len(cd_transcription_files)):
+	cd_pause_features.append(dataset_features.get_pause_features(
+		transcription_filename=cd_transcription_files[i], 
+		audio_filename=cd_audio_files[i], 
+		audio_length_normalization=audio_length_normalization))
+
+	cd_spectogram_features.append(dataset_features.get_spectogram_features(
+		spectogram_filename=cd_spectogram_files[i], 
+		output_size=spectrogram_size[::-1]))
+
+	cd_invervention_features.append(dataset_features.get_intervention_features(
+		transcription_filename=cd_transcription_files[i],
+		max_length=longest_speaker_length))
+
+pause_features = np.concatenate((cc_pause_features, cd_pause_features), axis=0)
+spectrogram_features = np.concatenate((cc_spectogram_features, cd_spectogram_features), axis=0)
+intervention_features = np.concatenate((cc_invervention_features, cd_invervention_features), axis=0)
+
+filenames = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
+
+y_cc = np.zeros((len(cc_pause_features), 2))
+y_cc[:,0] = 1
+
+y_cd = np.zeros((len(cd_pause_features), 2))
+y_cd[:,1] = 1
+
+y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+
+p = np.random.permutation(len(pause_features))
+pause_features = pause_features[p]
+spectogram_features = spectrogram_features[p]
+intervention_features = intervention_features[p]
+y = y[p]
+
+print('Loading models...')
+pause_model_files = sorted(glob.glob('models/pause_models/*.h5'))
+pause_models = list(map(lambda x: tf.keras.models.load_model(x), pause_model_files))
+
+spec_model_files = sorted(glob.glob('models/spec_models/*.h5'))
+spec_models = list(map(lambda x: tf.keras.models.load_model(x), spec_model_files))
+
+intervention_model_files = sorted(glob.glob('models/intervention_models/*.h5'))
+intervention_models = list(map(lambda x: tf.keras.models.load_model(x), intervention_model_files))
+
+fold = 0
+n_split = 5
+# voting_type = 'hard_voting'
+voting_type = 'soft_voting'
+
+train_accuracies = []
+val_accuracies = []
+for train_index, val_index in KFold(n_split).split(pause_features):
+	pause_train, pause_val = pause_features[train_index], pause_features[val_index]
+	spec_train, spec_val = spectogram_features[train_index], spectogram_features[val_index]
+	inv_train, inv_val = intervention_features[train_index], intervention_features[val_index]
+	y_train, y_val = y[train_index], y[val_index]
+
+	filenames_train, filenames_val = filenames[train_index], filenames[val_index]
+
+	pause_probs = pause_models[fold].predict(pause_train)
+	spec_probs = spec_models[fold].predict(spec_train)
+	inv_probs = intervention_models[fold].predict(inv_train)
+
+	if voting_type=='hard_voting':
+		model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_train))]
+		voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
+	elif voting_type=='soft_voting':
+		model_predictions = pause_probs + spec_probs + inv_probs
+		# print(model_predictions)
+		voted_predictions = np.argmax(model_predictions, axis=-1)
+		# print(voted_predictions)
+
+	train_accuracy = accuracy_score(np.argmax(y_train, axis=-1), voted_predictions)
+	train_accuracies.append(train_accuracy)
+	print('Fold {} Training Accuracy {:.3f}'.format(fold, train_accuracy))
+
+	pause_probs = pause_models[fold].predict(pause_val)
+	spec_probs = spec_models[fold].predict(spec_val)
+	inv_probs = intervention_models[fold].predict(inv_val)
+
+	if voting_type=='hard_voting':
+		model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_val))]
+		voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
+	elif voting_type=='soft_voting':
+		model_predictions = pause_probs + spec_probs + inv_probs
+		voted_predictions = np.argmax(model_predictions, axis=-1)
+	# continue
+	val_accuracy = accuracy_score(np.argmax(y_val, axis=-1), voted_predictions)
+	val_accuracies.append(val_accuracy)
+	print('Fold {} Val Accuracy {:.3f}'.format(fold, val_accuracy))
+	fold+=1
+
+
+print('Train accuracy mean: {:.3f}'.format(np.mean(train_accuracies)))
+print('Train accuracy std: {:.3f}'.format(np.std(train_accuracies)))
+print('Val accuracy mean: {:.3f}'.format(np.mean(val_accuracies)))
+print('Val accuracy std: {:.3f}'.format(np.std(val_accuracies)))
 
