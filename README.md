@@ -13,3 +13,9 @@ Tried for different values of C and gamma, best values C = 10, gamma = 0.5
 
 Tried svm on 11 features
 ![picture](images/11_features.png)
+
+
+### Paper notes
+
+offline training say on phone or webapp, edge ML
+one of top 5 causes of deaths - verify (cite source)
