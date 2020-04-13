@@ -25,86 +25,86 @@ import dataset_features
 import dataset_utils
 
 def prepare_data():
-  dataset_dir = '../ADReSS-IS2020-data/train'
+	dataset_dir = '../ADReSS-IS2020-data/train'
 
-  cc_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
-  cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')))
+	cc_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
+	cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')))
 
-  all_counts_cc = []
-  for t_f, a_f in zip(cc_transcription_files, cc_audio_files):
-    pause_features = dataset_features.get_pause_features(t_f, a_f)
-    all_counts_cc.append(pause_features)
+	all_counts_cc = []
+	for t_f, a_f in zip(cc_transcription_files, cc_audio_files):
+		pause_features = dataset_features.get_pause_features(t_f, a_f)
+		all_counts_cc.append(pause_features)
 
 
-  cd_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
-  cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
+	cd_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
+	cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
 
-  all_counts_cd = [] 
-  for t_f, a_f in zip(cd_transcription_files, cd_audio_files):
-    pause_features = dataset_features.get_pause_features(t_f, a_f)
-    all_counts_cd.append(pause_features)
+	all_counts_cd = [] 
+	for t_f, a_f in zip(cd_transcription_files, cd_audio_files):
+		pause_features = dataset_features.get_pause_features(t_f, a_f)
+		all_counts_cd.append(pause_features)
 
-  X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
+	X = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
-  ### Regression y values
-  y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
-  y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+	### Regression y values
+	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
-  y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
-  #######################
+	y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+	#######################
 
-  ### Regression X values
-  X_reg = np.copy(X)
-  #######################
+	### Regression X values
+	X_reg = np.copy(X)
+	#######################
 
-  ### Classification y values
-  y_cc = np.zeros((len(all_counts_cc), 2))
-  y_cc[:,0] = 1
+	### Classification y values
+	y_cc = np.zeros((len(all_counts_cc), 2))
+	y_cc[:,0] = 1
 
-  y_cd = np.zeros((len(all_counts_cd), 2))
-  y_cd[:,1] = 1
+	y_cd = np.zeros((len(all_counts_cd), 2))
+	y_cd[:,1] = 1
 
-  y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
-  filenames = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
-  #######################
+	y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+	filenames = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
+	#######################
 
-  p = np.random.permutation(len(X))
-  X, X_reg = X[p], X_reg[p]
-  y, y_reg = y[p], y_reg[p]
-  filenames = filenames[p]
+	p = np.random.permutation(len(X))
+	X, X_reg = X[p], X_reg[p]
+	y, y_reg = y[p], y_reg[p]
+	filenames = filenames[p]
 
-  return X, y, X_reg, y_reg, filenames
+	return X, y, X_reg, y_reg, filenames
 
 
 def create_model():
-  # model = tf.keras.Sequential()
-  # model.add(layers.Input(shape=(10,)))
-  # model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-  # model.add(layers.Dense(32, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-  # model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-  # model.add(layers.Dropout(0.2))
-  # model.add(layers.Dense(2, activation='softmax'))
-  model = tf.keras.Sequential()
-  model.add(layers.Input(shape=(11,)))
-  # model.add(layers.Dropout(0.2))
-  model.add(layers.BatchNormalization())
-  model.add(layers.Dense(16, activation='relu'))
-  # model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
-  # model.add(layers.Dense(64, activation='relu'))
-  # model.add(layers.Dense(128, activation='relu'))
-  # model.add(layers.Dense(256, activation='sigmoid'))
-  # model.add(layers.Dense(128, activation='relu'))
-  # model.add(layers.Dense(64, activation='relu'))
-  model.add(layers.BatchNormalization())
-  model.add(layers.Dropout(0.5))
-  model.add(layers.Dense(32, activation='relu'))
-  model.add(layers.BatchNormalization())
-  model.add(layers.Dropout(0.5))
-  model.add(layers.Dense(16, activation='relu'))
-  model.add(layers.BatchNormalization())
-  model.add(layers.Dropout(0.5))
-  model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-  return model
+	# model = tf.keras.Sequential()
+	# model.add(layers.Input(shape=(10,)))
+	# model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+	# model.add(layers.Dense(32, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+	# model.add(layers.Dense(16, activation='sigmoid', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+	# model.add(layers.Dropout(0.2))
+	# model.add(layers.Dense(2, activation='softmax'))
+	model = tf.keras.Sequential()
+	model.add(layers.Input(shape=(11,)))
+	# model.add(layers.Dropout(0.2))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dense(16, activation='relu'))
+	# model.add(layers.Dense(32, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+	# model.add(layers.Dense(64, activation='relu'))
+	# model.add(layers.Dense(128, activation='relu'))
+	# model.add(layers.Dense(256, activation='sigmoid'))
+	# model.add(layers.Dense(128, activation='relu'))
+	# model.add(layers.Dense(64, activation='relu'))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dropout(0.5))
+	model.add(layers.Dense(32, activation='relu'))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dropout(0.5))
+	model.add(layers.Dense(16, activation='relu'))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dropout(0.5))
+	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+	return model
 
 def regression_baseline():
 
@@ -137,11 +137,12 @@ def regression(models):
 
 		# def root_mean_squared_error(y_true, y_pred):
 		# 	return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
+		fold+=1
 
 		x_train, x_val = X_reg[train_index], X_reg[val_index]
 		y_train, y_val = y_reg[train_index], y_reg[val_index]
 
-		model = models[fold]
+		model = models[fold-1]
 		model.pop()
 		for layer in model.layers:
 			layer.trainable = False
@@ -159,7 +160,7 @@ def regression(models):
 			optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-						'best_model_reg_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+						'best_model_reg_{}.h5'.format(fold), monitor='loss', verbose=0, save_best_only=True,
 						save_weights_only=False, mode='auto', save_freq='epoch')
 
 		model_reg.fit(x_train, y_train,
@@ -181,7 +182,7 @@ def regression(models):
 		all_val_predictions.append(val_predictions)
 		all_train_true.append(y_train)
 		all_val_true.append(y_val)
-		fold+=1
+		
 
 	print()
 	print('################### TRAIN VALUES ###################')
@@ -214,80 +215,106 @@ def regression(models):
 
 def training():
 
-  n_split = 5
-  epochs = 600
-  batch_size = 8
+	n_split = 5
+	epochs = 600
+	batch_size = 8
 
-  val_accuracies = []
-  train_accuracies = []
+	val_accuracies = []
+	train_accuracies = []
 
-  X, y, _, _, filenames = prepare_data()
-  fold = 0
-  models = []
+	X, y, _, _, filenames = prepare_data()
+	fold = 0
+	models = []
 
-  for train_index, val_index in KFold(n_split).split(X):
+	for train_index, val_index in KFold(n_split).split(X):
+		fold+=1
 
-    x_train, x_val = X[train_index], X[val_index]
-    y_train, y_val = y[train_index], y[val_index]
-    filenames_train, filenames_val = filenames[train_index], filenames[val_index]
+		x_train, x_val = X[train_index], X[val_index]
+		y_train, y_val = y[train_index], y[val_index]
+		filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
 
-    model = create_model()
+		model = create_model()
 
-    # timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-    # log_name = "{}".format(timeString)
-    # tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
+		# timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+		# log_name = "{}".format(timeString)
+		# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
 
-    model.compile(loss=tf.keras.losses.categorical_crossentropy,
-                  optimizer=tf.keras.optimizers.Adam(lr=0.001),
-                  metrics=['categorical_accuracy'])
+		model.compile(loss=tf.keras.losses.categorical_crossentropy,
+		              optimizer=tf.keras.optimizers.Adam(lr=0.001),
+		              metrics=['categorical_accuracy'])
 
-    checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
-            save_weights_only=False, mode='auto', save_freq='epoch')
+		checkpointer = tf.keras.callbacks.ModelCheckpoint(
+		        'best_model_pause_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+		        save_weights_only=False, mode='auto', save_freq='epoch')
 
-    model.fit(x_train, y_train,
-              batch_size=batch_size,
-              epochs=epochs,
-              verbose=1,
-              callbacks=[checkpointer],
-              validation_data=(x_val, y_val))
+		model.fit(x_train, y_train,
+		          batch_size=batch_size,
+		          epochs=epochs,
+		          verbose=1,
+		          callbacks=[checkpointer],
+		          validation_data=(x_val, y_val))
 
-    model = tf.keras.models.load_model('best_model_{}.h5'.format(fold))
-    val_pred = model.predict(x_val)
+		model = tf.keras.models.load_model('best_model_pause_{}.h5'.format(fold))
+		val_pred = model.predict(x_val)
 
-    for i in range(len(x_val)):
-        print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
-    models.append(model)
-    train_score = model.evaluate(x_train, y_train, verbose=0)
+		for i in range(len(x_val)):
+		    print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
+		models.append(model)
+		train_score = model.evaluate(x_train, y_train, verbose=0)
 
-    train_accuracies.append(train_score[1])
-    score = model.evaluate(x_val, y_val, verbose=0)
-    print('Val accuracy:', score[1])
-    val_accuracies.append(score[1])
-    fold+=1
-    print('Train accuracies ', train_accuracies)
-    print('Train mean', np.mean(train_accuracies))
-    print('Train std', np.std(train_accuracies))
+		train_accuracies.append(train_score[1])
+		score = model.evaluate(x_val, y_val, verbose=0)
+		print('Val accuracy:', score[1])
+		val_accuracies.append(score[1])
 
-    print('Val accuracies ', val_accuracies)
-    print('Val mean', np.mean(val_accuracies))
-    print('Val std', np.std(val_accuracies))
+	print('Train accuracies ', train_accuracies)
+	print('Train mean', np.mean(train_accuracies))
+	print('Train std', np.std(train_accuracies))
+
+	print('Val accuracies ', val_accuracies)
+	print('Val mean', np.mean(val_accuracies))
+	print('Val std', np.std(val_accuracies))
     # exit()
+	return models
+
+def training_on_entire_dataset():
+
+	epochs = 600
+	batch_size = 8	
+	X, y, _, _, filenames = prepare_data()
+
+	model = create_model()
+	model.compile(loss=tf.keras.losses.categorical_crossentropy,
+		              optimizer=tf.keras.optimizers.Adam(lr=0.001),
+		              metrics=['categorical_accuracy'])
+
+	checkpointer = tf.keras.callbacks.ModelCheckpoint(
+	        'best_model_pause.h5', monitor='loss', verbose=0, save_best_only=True,
+	        save_weights_only=False, mode='auto', save_freq='epoch')
+
+	model.fit(X, y,
+	          batch_size=batch_size,
+	          epochs=epochs,
+	          verbose=1,
+	          callbacks=[checkpointer])
+
+	model = tf.keras.models.load_model('best_model_pause.h5')
+	train_loss, train_acc = model.evaluate(X, y, verbose=0)
+	print('Train Loss: {}\t Train Accuracy: {}'.format(train_loss, train_acc))
 
 
 
 
+# models = training()
 
-  return models
-
-models = training()
-
-models = [tf.keras.models.load_model('best_model_{}.h5'.format(fold)) for fold in range(5)]
-print(models)
-regression(models)
+# models = [tf.keras.models.load_model('best_model_pause_{}.h5'.format(fold)) for fold in range(1,6)]
+# print(models)
+# regression(models)
 
 # regression_baseline()
+
+training_on_entire_dataset()
 
 
 
