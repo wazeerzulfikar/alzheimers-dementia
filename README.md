@@ -17,8 +17,8 @@ Tried svm on 11 features
 
 ### Paper notes
 
-offline training say on phone or webapp, edge ML
-one of top 5 causes of deaths - verify (cite source)
-remove intervention count/rate from pause_features
-compare counts vs rates as features
-establish individual model baselines, compare to ensemble (different types of voting)
+offline training say on phone or webapp, edge ML. 
+one of top 5 causes of deaths - verify (cite source).  
+remove intervention count/rate from pause_features.  
+compare counts vs rates as features.  
+establish individual model baselines, compare to ensemble (different types of voting).  
