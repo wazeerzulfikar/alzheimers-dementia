@@ -6,7 +6,7 @@ The thresholds are looped over 1 to 9 to find best one.
 import glob
 import os
 import numpy as np
-np.random.seed(42)
+np.random.seed(0)
 
 import tensorflow as tf
 

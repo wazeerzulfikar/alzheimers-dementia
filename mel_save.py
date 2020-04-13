@@ -9,17 +9,20 @@ import librosa
 import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
-print('hello')
+import matplotlib.image as mpimg
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
-n_fft = 2048
-hop_length = 512
-n_mels = 128
+def mel_save(filename, save_path, save=False):
+	'''
+	filename - input .wav file
+	save - if True, spectrogram is saved in save_path, otherwise returned from this function
+	save_path is always required since while returning the image is saved, read and then deleted
+	'''
 
-dataset_dir = 'train/Full_wave_enhanced_audio/cc/'
-files = sorted(glob.glob(os.path.join(dataset_dir, '*.wav')))
+	n_fft = 2048
+	hop_length = 512
+	n_mels = 128
 
-for filename in files:
-	print(filename)
 	plt.clf()
 	fig = plt.figure(frameon=False)
 
@@ -43,6 +46,21 @@ for filename in files:
 	# plt.colorbar(format='%+2.0f dB')
 	plt.title(filename)
 
-	fig.savefig(os.path.join(dataset_dir+'images/', filename.strip(".wav").strip("train/Full_wave_enhanced_audio/cd/")))
-	print('saved')
-	# plt.show()
+	if save:
+		fig.savefig(os.path.join(save_path, filename.strip(".wav").split('/')[-1]))
+		print('Saved')
+	else:
+		fig.savefig(os.path.join(save_path, filename.strip(".wav").split('/')[-1]))
+		print('Saved')
+		img = mpimg.imread(os.path.join(save_path, filename.strip(".wav").split('/')[-1]+".png"))[:,:,:3].astype(np.float32)
+		os.remove(os.path.join(save_path, filename.strip(".wav").split('/')[-1]+".png"))
+		return img
+
+# dataset_dir = '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio'
+# files = sorted(glob.glob(os.path.join(dataset_dir, 'cc/*.wav')))
+# for filename in files:
+# 	print(filename)
+# 	# fig = mel_save(filename, '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/images/cc', True)
+# 	fig = mel_save(filename, '../ADReSS-IS2020-data/train/Full_wave_enhanced_audio/images/cc', False)
+# 	print(fig.shape)
+# 	exit()
