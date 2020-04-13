@@ -345,7 +345,7 @@ def create_model(_type_ = 'convolutional'):
 	return model
 
 
-model = create_model(_type_='fully_convolutional')
+model = create_model(_type_='old')
 
 print(model.summary())
 print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
@@ -353,59 +353,62 @@ print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
 ################################# CROSS VALIDATED MODEL TRAINING ################################
 
-n_split = 5
+def training(X, y):
+	n_split = 5
 
-epochs = 50
-batch_size = 8
+	epochs = 50
+	batch_size = 8
 
-val_accuracies = []
-train_accuracies = []
-fold = 0
+	val_accuracies = []
+	train_accuracies = []
+	fold = 0
 
-for train_index, val_index in KFold(n_split, shuffle=True).split(X):
+	for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 
-	x_train, x_val = X[train_index], X[val_index]
-	y_train, y_val = y[train_index], y[val_index]
-	filenames_train, filenames_val = filenames[train_index], filenames[val_index]
+		fold+=1
 
-	model = create_model(_type_='fully_convolutional')
+		x_train, x_val = X[train_index], X[val_index]
+		y_train, y_val = y[train_index], y[val_index]
+		filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
-	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-	log_name = "{}".format(timeString)
+		model = create_model(_type_='old')
 
-	# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
+		timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+		log_name = "{}".format(timeString)
 
-	model.compile(loss=tf.keras.losses.categorical_crossentropy,
-				  optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
-				  metrics=['categorical_accuracy'])
+		# tensorboard = TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
 
-	datagen = DataGenerator(x_train, y_train, batch_size)
+		model.compile(loss=tf.keras.losses.categorical_crossentropy,
+					  optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
+					  metrics=['categorical_accuracy'])
 
-	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model_spec_2_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
-            save_weights_only=False, mode='auto', save_freq='epoch'
-        )
-	model.fit(datagen.flow(),
-			  epochs=epochs,
-			  steps_per_epoch=datagen.get_n_batches(),
-			  verbose=1,
-			  callbacks=[checkpointer],
-			  validation_data=(x_val, y_val))
-	model = tf.keras.models.load_model('best_model_spec_2_{}.h5'.format(fold))
+		datagen = DataGenerator(x_train, y_train, batch_size)
 
-	val_pred = model.predict(x_val)
-	for i in range(len(x_val)):
-		print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
+		checkpointer = tf.keras.callbacks.ModelCheckpoint(
+	            'best_model_spec_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
+	            save_weights_only=False, mode='auto', save_freq='epoch'
+	        )
+		model.fit(datagen.flow(),
+				  epochs=epochs,
+				  steps_per_epoch=datagen.get_n_batches(),
+				  verbose=1,
+				  callbacks=[checkpointer],
+				  validation_data=(x_val, y_val))
+		model = tf.keras.models.load_model('best_model_spec_{}.h5'.format(fold))
 
-	train_score = model.evaluate(x_train, y_train, verbose=0)
-	# print('_'*30)
-	# print(model.predict(x_train))
-	# print(model.predict(x_val))
+		val_pred = model.predict(x_val)
+		for i in range(len(x_val)):
+			print(filenames_val[i], np.argmax(val_pred[i])==np.argmax(y_val[i]), val_pred[i])
 
-	train_accuracies.append(train_score[1])
-	score = model.evaluate(x_val, y_val, verbose=0)
-	print('Val accuracy:', score[1])
-	val_accuracies.append(score[1])
+		train_score = model.evaluate(x_train, y_train, verbose=0)
+		# print('_'*30)
+		# print(model.predict(x_train))
+		# print(model.predict(x_val))
+
+		train_accuracies.append(train_score[1])
+		score = model.evaluate(x_val, y_val, verbose=0)
+		print('Val accuracy:', score[1])
+		val_accuracies.append(score[1])
 
 	print('Train accuracies ', train_accuracies)
 	print('Train mean', np.mean(train_accuracies))
@@ -415,5 +418,31 @@ for train_index, val_index in KFold(n_split, shuffle=True).split(X):
 	print('Val mean', np.mean(val_accuracies))
 	print('Val std', np.std(val_accuracies))
 
-	fold+=1
+def training_on_entire_dataset(X, y):
+
+	epochs = 50
+	batch_size = 8	
+
+	model = create_model(_type_='old')
+	model.compile(loss=tf.keras.losses.categorical_crossentropy,
+		              optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
+		              metrics=['categorical_accuracy'])
+	datagen = DataGenerator(X, y, batch_size)
+
+	checkpointer = tf.keras.callbacks.ModelCheckpoint(
+	        'best_model_spec.h5', monitor='loss', verbose=0, save_best_only=True,
+	        save_weights_only=False, mode='auto', save_freq='epoch')
+
+	model.fit(datagen.flow(),
+			  epochs=epochs,
+			  steps_per_epoch=datagen.get_n_batches(),
+			  verbose=1,
+			  callbacks=[checkpointer])
+
+	model = tf.keras.models.load_model('best_model_spec.h5')
+	train_loss, train_acc = model.evaluate(X, y, verbose=0)
+	print('Train Loss: {}\t Train Accuracy: {}'.format(train_loss, train_acc))
+
+training_on_entire_dataset(X, y)
+
 
