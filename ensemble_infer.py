@@ -4,6 +4,7 @@ import glob
 import tensorflow as tf
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LogisticRegression
 import numpy as np
 np.random.seed(0)
 
@@ -73,21 +74,26 @@ pause_features = pause_features[p]
 spectogram_features = spectrogram_features[p]
 intervention_features = intervention_features[p]
 y = y[p]
+filenames = filenames[p]
 
-print('Loading models...')
-pause_model_files = sorted(glob.glob('models/pause_models/*.h5'))
+model_dir = 'train_loss_models'
+print('Loading models from {}'.format(model_dir))
+pause_model_files = sorted(glob.glob(os.path.join(model_dir, 'pause_models/*.h5')))
 pause_models = list(map(lambda x: tf.keras.models.load_model(x), pause_model_files))
 
-spec_model_files = sorted(glob.glob('models/spec_models/*.h5'))
+spec_model_files = sorted(glob.glob(os.path.join(model_dir,'spec_models/*.h5')))
 spec_models = list(map(lambda x: tf.keras.models.load_model(x), spec_model_files))
 
-intervention_model_files = sorted(glob.glob('models/intervention_models/*.h5'))
+intervention_model_files = sorted(glob.glob(os.path.join(model_dir,'intervention_models/*.h5')))
 intervention_models = list(map(lambda x: tf.keras.models.load_model(x), intervention_model_files))
 
 fold = 0
 n_split = 5
 # voting_type = 'hard_voting'
-voting_type = 'soft_voting'
+# voting_type = 'soft_voting'
+voting_type = 'learnt_voting'
+
+print('Voting type {}'.format(voting_type))
 
 train_accuracies = []
 val_accuracies = []
@@ -106,11 +112,16 @@ for train_index, val_index in KFold(n_split).split(pause_features):
 	if voting_type=='hard_voting':
 		model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_train))]
 		voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
+
 	elif voting_type=='soft_voting':
 		model_predictions = pause_probs + spec_probs + inv_probs
-		# print(model_predictions)
 		voted_predictions = np.argmax(model_predictions, axis=-1)
-		# print(voted_predictions)
+
+	elif voting_type=='learnt_voting':
+		model_predictions = np.concatenate((pause_probs, spec_probs, inv_probs), axis=-1)
+		voter = LogisticRegression().fit(model_predictions, np.argmax(y_train, axis=-1))
+		# print('Voter coef ', voter.coef_)
+		voted_predictions = voter.predict(model_predictions)
 
 	train_accuracy = accuracy_score(np.argmax(y_train, axis=-1), voted_predictions)
 	train_accuracies.append(train_accuracy)
@@ -126,6 +137,10 @@ for train_index, val_index in KFold(n_split).split(pause_features):
 	elif voting_type=='soft_voting':
 		model_predictions = pause_probs + spec_probs + inv_probs
 		voted_predictions = np.argmax(model_predictions, axis=-1)
+	elif voting_type=='learnt_voting':
+		model_predictions = np.concatenate((pause_probs, spec_probs, inv_probs), axis=-1)
+		# voter = LogisticRegression().fit(model_predictions, np.argmax(y_train, axis=-1))
+		voted_predictions = voter.predict(model_predictions)
 	# continue
 	val_accuracy = accuracy_score(np.argmax(y_val, axis=-1), voted_predictions)
 	val_accuracies.append(val_accuracy)
