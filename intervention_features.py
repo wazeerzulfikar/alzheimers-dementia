@@ -142,7 +142,27 @@ def training_on_entire_dataset(X, y, longest_speaker_length):
     train_loss, train_acc = model.evaluate(X, y, verbose=0)
     print('Train Loss: {}\t Train Accuracy: {}'.format(train_loss, train_acc))
 
-training_on_entire_dataset(X, y, longest_speaker_length)
+def evaluate_models():
+    '''
+    Evaluate the saved models - 'best_model_intervention_1.h5', ... , 'best_model_intervention_5.h5'
+    '''
+
+    n_split = 5
+    fold = 0
+    val_accuracies = []
+    for train_index, val_index in KFold(n_split).split(X):
+        fold+=1
+        x_val, y_val = X[val_index], y[val_index]
+        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))
+        val_score = model.evaluate(x_val, y_val, verbose=0)
+        val_accuracies.append(val_score[1])
+    print('Val accuracies ', val_accuracies)
+    print('Val mean', np.mean(val_accuracies))
+    print('Val std', np.std(val_accuracies))
+
+
+evaluate_models()
+# training_on_entire_dataset(X, y, longest_speaker_length)
 
 
 ####################  Simple Thresholding ####################
