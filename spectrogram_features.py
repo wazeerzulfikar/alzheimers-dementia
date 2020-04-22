@@ -416,7 +416,7 @@ def training(X, y, loocv=False):
 		score = model.evaluate(x_val, y_val, verbose=0)
 		print('Val accuracy:', score[1])
 		val_accuracies.append(score[1])
-		print('Val mean till now:', np.mean(val_accuracies))
+		print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies)))
 
 	print('Train accuracies ', train_accuracies)
 	print('Train mean', np.mean(train_accuracies))
