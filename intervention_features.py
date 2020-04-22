@@ -5,6 +5,7 @@ The thresholds are looped over 1 to 9 to find best one.
 
 import glob
 import os
+import math
 import numpy as np
 np.random.seed(0)
 
@@ -14,22 +15,22 @@ from tensorflow.keras import layers
 from sklearn.model_selection import KFold
 import time
 
-import dataset_features
+import dataset_features, dataset_utils
 
 longest_speaker_length = 32
-dataset_dir = '../ADReSS-IS2020-data/train/transcription'
+dataset_dir = '../ADReSS-IS2020-data/train'
 
-cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc/*.cha')))
+cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
 all_speakers_cc = []
 for filename in cc_files:
     all_speakers_cc.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
 
-cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd/*.cha')))
+cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
 all_speakers_cd = []
 for filename in cd_files:
     all_speakers_cd.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
 
-
+### Classification X and y values
 y_cc = np.zeros((len(all_speakers_cc), 2))
 y_cc[:,0] = 1
 
@@ -39,10 +40,19 @@ y_cd[:,1] = 1
 X = np.concatenate((all_speakers_cc, all_speakers_cd), axis=0).astype(np.float32)
 y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 filenames = np.concatenate((cc_files, cd_files), axis=0)
+################################
+
+### Regression X and y values
+y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+
+y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+X_reg = np.copy(X)
+#################################
 
 p = np.random.permutation(len(X))
-X = X[p]
-y = y[p]
+X, X_reg = X[p], X_reg[p]
+y, y_reg = y[p], y_reg[p]
 filenames = filenames[p]
 
 def create_model(longest_speaker_length, num_classes=2):
@@ -58,9 +68,15 @@ def create_model(longest_speaker_length, num_classes=2):
 
     return model
 
-def training():
+def training(loocv=False):
 
-    n_split = 5
+    if loocv==True:
+        n_split = X.shape[0]
+        model_dir = 'loocv-models-intervention'
+    else:
+        n_split = 5
+        model_dir = '5-fold-models-intervention'
+        
     epochs = 400
     batch_size = 8
     val_accuracies = []
@@ -82,7 +98,7 @@ def training():
 
         # print(model.predict(x_val))
         checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model_intervention_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
+            os.path.join(model_dir, 'intervention_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=False,
             save_weights_only=False, mode='auto', save_freq='epoch'
         )
 
@@ -95,7 +111,7 @@ def training():
                   verbose=1,
                   validation_data=(x_val, y_val),
                     callbacks=[checkpointer])
-        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))
+        model = tf.keras.models.load_model(os.path.join(model_dir, 'intervention_{}.h5'.format(fold)))
 
         val_pred = model.predict(x_val)
 
@@ -108,6 +124,7 @@ def training():
         val_score = model.evaluate(x_val, y_val, verbose=0)
         print('Val accuracy:', val_score[1])
         val_accuracies.append(val_score[1])
+        print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies)))
 
     print('Train accuracies ', train_accuracies)
     print('Train mean', np.mean(train_accuracies))
@@ -156,14 +173,109 @@ def evaluate_models():
         model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))
         val_score = model.evaluate(x_val, y_val, verbose=0)
         val_accuracies.append(val_score[1])
-    print('Val accuracies ', val_accuracies)
-    print('Val mean', np.mean(val_accuracies))
-    print('Val std', np.std(val_accuracies))
+    print('Val accuracies ', val_accuracies) # [0.6363636, 0.90909094, 0.77272725, 0.71428573, 0.8095238]
+    print('Val mean', np.mean(val_accuracies)) # 0.768
+    print('Val std', np.std(val_accuracies)) # 0.09
 
+def regression():
+    '''
+    Performs regression on classification models
+    '''
 
-evaluate_models()
+    fold = 0
+    n_split = 5
+    epochs = 2000
+    batch_size = 8
+
+    train_scores, val_scores = [], []
+    all_train_predictions, all_val_predictions = [], []
+    all_train_true, all_val_true = [], []
+
+    for train_index, val_index in KFold(n_split).split(X_reg):
+
+        fold+=1
+        print('\n######################### FOLD {} #########################\n'.format(fold))
+        x_train, x_val = X_reg[train_index], X_reg[val_index]
+        y_train, y_val = y_reg[train_index], y_reg[val_index]
+        
+        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))    
+        model.pop()
+        for layer in model.layers:
+            layer.trainable = False
+
+        model_reg = tf.keras.Sequential()
+        model_reg.add(model)
+        model_reg.add(layers.Dense(16, activation='relu'))
+        model_reg.add(layers.Dense(8, activation='relu'))
+        # model_reg.add(layers.BatchNormalization())
+        # model_reg.add(layers.Dropout(0.5))
+        model_reg.add(layers.Dense(1, activation='relu'))
+
+        # print(model_reg.summary())
+        # exit()
+        model_reg.compile(loss=tf.keras.losses.mean_squared_error,
+            optimizer=tf.keras.optimizers.Adam(lr=0.001))
+
+        checkpointer = tf.keras.callbacks.ModelCheckpoint(
+                        'best_model_intervention_reg_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+                        save_weights_only=False, mode='auto', save_freq='epoch')
+        timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        log_name = "{}".format(timeString)
+        tensorboard = tf.keras.callbacks.TensorBoard(log_dir="logs/{}".format(log_name), histogram_freq=1, write_graph=True, write_images=False)
+
+        model_reg.fit(x_train, y_train,
+                            batch_size=batch_size,
+                            epochs=epochs,
+                            verbose=1,
+                            callbacks=[checkpointer, tensorboard],
+                            validation_data=(x_val, y_val))
+
+        model_reg = tf.keras.models.load_model('best_model_intervention_reg_{}.h5'.format(fold))
+        # models.append(model)
+        train_score = math.sqrt(model_reg.evaluate(x_train, y_train, verbose=0))
+        train_scores.append(train_score)
+
+        val_score = math.sqrt(model_reg.evaluate(x_val, y_val, verbose=0))
+        val_scores.append(val_score)
+
+        train_predictions, val_predictions = model_reg.predict(x_train), model_reg.predict(x_val)
+        all_train_predictions.append(train_predictions)
+        all_val_predictions.append(val_predictions)
+        all_train_true.append(y_train)
+        all_val_true.append(y_val)
+
+    print()
+    print('################### TRAIN VALUES ###################')
+    for f in range(n_split):
+        print()
+        print('################### FOLD {} ###################'.format(f))
+        print('True Values \t Predicted Values')
+        for i in range(all_train_true[f].shape[0]):
+            print(all_train_true[f][i], '\t\t', all_train_predictions[f][i,0])
+
+    print()
+    print('################### VAL VALUES ###################')
+    for f in range(n_split):
+        print()
+        print('################### FOLD {} ###################'.format(f))
+        print('True Values \t Predicted Values')
+        for i in range(all_val_true[f].shape[0]):
+            print(all_val_true[f][i], '\t\t', all_val_predictions[f][i,0])
+
+    print()
+    print('Train Scores ', train_scores)
+    print('Train mean', np.mean(train_scores))
+    print('Train std', np.std(train_scores))
+    
+    print()
+    print('Val accuracies ', val_scores)
+    print('Val mean', np.mean(val_scores))
+    print('Val std', np.std(val_scores))
+
+# regression()
+# evaluate_models()
 # training_on_entire_dataset(X, y, longest_speaker_length)
-
+training(loocv=True)
 
 ####################  Simple Thresholding ####################
 # for threshold in range(10):
