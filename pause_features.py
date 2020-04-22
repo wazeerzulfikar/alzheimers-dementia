@@ -213,9 +213,8 @@ def regression(models):
 	print('Val std', np.std(val_scores))
 
 
-def training():
+def training(loocv=False):
 
-	n_split = 5
 	epochs = 600
 	batch_size = 8
 
@@ -223,6 +222,14 @@ def training():
 	train_accuracies = []
 
 	X, y, _, _, filenames = prepare_data()
+
+	if loocv==True:
+		n_split = X.shape[0]
+		model_dir = 'loocv-models-pause'
+	else:
+		n_split = 5
+		model_dir = '5-fold-models-pause'
+
 	fold = 0
 	models = []
 
@@ -245,7 +252,7 @@ def training():
 		              metrics=['categorical_accuracy'])
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-		        'best_model_pause_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+		        os.path.join(model_dir, 'pause_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
 		        save_weights_only=False, mode='auto', save_freq='epoch')
 
 		model.fit(x_train, y_train,
@@ -255,7 +262,7 @@ def training():
 		          callbacks=[checkpointer],
 		          validation_data=(x_val, y_val))
 
-		model = tf.keras.models.load_model('best_model_pause_{}.h5'.format(fold))
+		model = tf.keras.models.load_model(os.path.join(model_dir, 'pause_{}.h5'.format(fold)))
 		val_pred = model.predict(x_val)
 
 		for i in range(len(x_val)):
@@ -267,6 +274,7 @@ def training():
 		score = model.evaluate(x_val, y_val, verbose=0)
 		print('Val accuracy:', score[1])
 		val_accuracies.append(score[1])
+		print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies)))
 
 	print('Train accuracies ', train_accuracies)
 	print('Train mean', np.mean(train_accuracies))
@@ -306,7 +314,7 @@ def training_on_entire_dataset():
 
 
 
-# models = training()
+models = training(loocv=True)
 
 # models = [tf.keras.models.load_model('best_model_pause_{}.h5'.format(fold)) for fold in range(1,6)]
 # print(models)
@@ -314,7 +322,7 @@ def training_on_entire_dataset():
 
 # regression_baseline()
 
-training_on_entire_dataset()
+# training_on_entire_dataset()
 
 
 
