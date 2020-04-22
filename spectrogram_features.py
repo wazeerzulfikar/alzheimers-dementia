@@ -370,7 +370,7 @@ def training(X, y, loocv=False):
 	train_accuracies = []
 	fold = 0
 
-	for train_index, val_index in KFold(n_split, shuffle=True).split(X):
+	for train_index, val_index in KFold(n_split).split(X):
 
 		fold+=1
 
