@@ -353,8 +353,15 @@ print(X.shape, y.shape) # (108, 480, 640, 3)     (108, 2)
 
 ################################# CROSS VALIDATED MODEL TRAINING ################################
 
-def training(X, y):
-	n_split = 5
+def training(X, y, loocv=False):
+	
+	if loocv==True:
+		n_split = X.shape[0]
+		model_dir = 'loocv-models-spectrogram'
+	else:
+		n_split = 5
+		model_dir = '5-fold-models-spectrogram'
+
 
 	epochs = 50
 	batch_size = 8
@@ -385,7 +392,7 @@ def training(X, y):
 		datagen = DataGenerator(x_train, y_train, batch_size)
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-	            'best_model_spec_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
+	            os.path.join(model_dir, 'spec_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=False,
 	            save_weights_only=False, mode='auto', save_freq='epoch'
 	        )
 		model.fit(datagen.flow(),
@@ -394,7 +401,7 @@ def training(X, y):
 				  verbose=1,
 				  callbacks=[checkpointer],
 				  validation_data=(x_val, y_val))
-		model = tf.keras.models.load_model('best_model_spec_{}.h5'.format(fold))
+		model = tf.keras.models.load_model(os.path.join(model_dir, 'spec_{}.h5'.format(fold)))
 
 		val_pred = model.predict(x_val)
 		for i in range(len(x_val)):
@@ -409,6 +416,7 @@ def training(X, y):
 		score = model.evaluate(x_val, y_val, verbose=0)
 		print('Val accuracy:', score[1])
 		val_accuracies.append(score[1])
+		print('Val mean till now:', np.mean(val_accuracies))
 
 	print('Train accuracies ', train_accuracies)
 	print('Train mean', np.mean(train_accuracies))
@@ -443,6 +451,7 @@ def training_on_entire_dataset(X, y):
 	train_loss, train_acc = model.evaluate(X, y, verbose=0)
 	print('Train Loss: {}\t Train Accuracy: {}'.format(train_loss, train_acc))
 
-training_on_entire_dataset(X, y)
+# training_on_entire_dataset(X, y)
+training(X, y, loocv=True)
 
 
