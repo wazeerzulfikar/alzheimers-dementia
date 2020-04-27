@@ -55,15 +55,63 @@ def get_intervention_features(transcription_filename, max_length=40):
 
     return intervention_features
 
+def feature_normalize(feature_data):
+    mean = np.mean(feature_data, axis=0)
+    std = np.std(feature_data, axis=0)
+    N = feature_data.shape[0]
+    S1 = np.sum(feature_data, axis=0)
+    S2 = np.sum(feature_data ** 2, axis=0)
+    mean=S1/N
+    std=np.sqrt((N * S2 - (S1 * S1)) / (N * (N - 1)))
+    mean = np.reshape(mean, [1, -1])
+    std = np.reshape(std, [1, -1])
+    feature_data=((feature_data-mean)/std)
+    return feature_data
 
-def get_spectogram_features(spectogram_filename, output_size=(640, 480), normalize=True):
+# def get_spectogram_features(spectogram_filename, output_size=(640, 480), normalize=True):
+#     '''
+#     Spectogram features include MFCC which has been pregenerated for the audio file 
+#     '''
+#     img = cv2.imread(spectogram_filename)
+#     img = cv2.resize(img, output_size)
+#     if normalize:
+#         # img = img / 255.
+#         img = feature_normalize(img)
+#     spectogram_features = img
+#     return spectogram_features
+
+def get_spectogram_features(spectogram_filename):
     '''
     Spectogram features include MFCC which has been pregenerated for the audio file 
     '''
-    img = cv2.imread(spectogram_filename)
-    img = cv2.resize(img, output_size)
-    if normalize:
-        img = img / 255.
-    spectogram_features = img
-    return spectogram_features
+    mel = np.load(spectogram_filename)
+    # mel = feature_normalize(mel) 
+    mel = np.expand_dims(mel, axis=-1) 
+    return mel
+
+
+def get_sliced_spectogram_features(spectogram_filename, timesteps_per_slice=1000, normalize=True):
+    '''
+    Spectogram features include MFCC which has been pregenerated for the audio file 
+    '''
+    mel = np.load(spectogram_filename)
+    # mel = feature_normalize(mel)
+    n_mels, timesteps = mel.shape
+    # if normalize:
+    #     mel_mean = np.mean(mel)
+    #     mel_std = np.std(mel)
+    #     mel = (mel - mel_mean) / mel_std
+    # print(timesteps)
+    # print(np.mean(mel), np.std(mel))
+    # print('-'*20)
+    mel_new = []
+    for i in range(0, timesteps - timesteps_per_slice, 256):
+        mel_new.append(mel[..., i:i+timesteps_per_slice])
+    # mel = mel[..., :-(timesteps % timesteps_per_slice)]
+
+    mel = np.reshape(mel_new, (-1, n_mels, timesteps_per_slice, 1))
+    return mel
+
+
+
 
