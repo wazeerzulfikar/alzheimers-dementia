@@ -97,12 +97,12 @@ def prepare_data():
 	dataset_dir = '../spectograms/'
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
 	spectogram_size = (480, 640)
-	X_cc = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cc_files])
+	X_cc = np.array([dataset_features.get_old_spectogram_features(f) for f in cc_files])
 	y_cc = np.zeros((X_cc.shape[0], 2))
 	y_cc[:,0] = 1
 
 	cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-	X_cd = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cd_files])
+	X_cd = np.array([dataset_features.get_old_spectogram_features(f) for f in cd_files])
 	y_cd = np.zeros((X_cd.shape[0], 2))
 	y_cd[:,1] = 1
 
@@ -111,8 +111,8 @@ def prepare_data():
 	filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
 	################################## SPECTROGRAM ####################################
 
-	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), 'Data streams are different'
-	print('Data streams verified')
+	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), '~ Data streams are different ~'
+	print('~ Data streams verified ~')
 	y = y_intervention
 	y_reg = y_reg_intervention
 	X_length = X_intervention.shape[0] # 108
@@ -410,10 +410,10 @@ def ensemble(voting_type, models=None):
 			train_accuracies_pause.append(pause.evaluate(pause_train, y_train, verbose=0)[1])
 			val_accuracies_pause.append(pause.evaluate(pause_val, y_val, verbose=0)[1])
 
-			# spec = tf.keras.models.load_model(os.path.join('5-fold-models-spectrogram', voting_type, 'spec_{}.h5'.format(fold)))
-			# models_spec.append(spec)
-			# train_accuracies_spec.append(spec.evaluate(spec_train, y_train, verbose=0)[1])
-			# val_accuracies_spec.append(spec.evaluate(spec_val, y_val, verbose=0)[1])		
+			spec = tf.keras.models.load_model(os.path.join('5-fold-models-spectrogram', voting_type, 'spec_{}.h5'.format(fold)))
+			models_spec.append(spec)
+			train_accuracies_spec.append(spec.evaluate(spec_train, y_train, verbose=0)[1])
+			val_accuracies_spec.append(spec.evaluate(spec_val, y_val, verbose=0)[1])		
 
 	fold = 0
 	n_split = 5
@@ -429,7 +429,7 @@ def ensemble(voting_type, models=None):
 
 		################################# TRAINING #################################
 		pause_probs = models_pause[fold].predict(pause_train)
-		# spec_probs = models_spec[fold].predict(spec_train)
+		spec_probs = models_spec[fold].predict(spec_train)
 		inv_probs = models_inv[fold].predict(inv_train)		
 
 		if voting_type=='hard_voting':
@@ -437,11 +437,11 @@ def ensemble(voting_type, models=None):
 			voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
 
 		elif voting_type=='soft_voting':
-			model_predictions = pause_probs + inv_probs
+			model_predictions = pause_probs + spec_probs + inv_probs
 			voted_predictions = np.argmax(model_predictions, axis=-1)
 
 		elif voting_type=='learnt_voting':
-			model_predictions = np.concatenate((pause_probs, inv_probs), axis=-1)
+			model_predictions = np.concatenate((pause_probs, inv_probs, spec_probs), axis=-1)
 			voter = LogisticRegression().fit(model_predictions, np.argmax(y_train, axis=-1))
 			voted_predictions = voter.predict(model_predictions)
 
@@ -450,20 +450,20 @@ def ensemble(voting_type, models=None):
 
 		################################ VALIDATION ################################
 		pause_probs = models_pause[fold].predict(pause_val)
-		# spec_probs = models_spec[fold].predict(spec_val)
+		spec_probs = models_spec[fold].predict(spec_val)
 		inv_probs = models_inv[fold].predict(inv_val)
 
 		if voting_type=='hard_voting':
 			model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_val))]
 			voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
 		elif voting_type=='soft_voting':
-			model_predictions = pause_probs + inv_probs
+			model_predictions = pause_probs + spec_probs + inv_probs
 			# for i,j in zip(model_predictions, y_val):
 			# 	print(i, '\t', j)
 			# exit()
 			voted_predictions = np.argmax(model_predictions, axis=-1)
 		elif voting_type=='learnt_voting':
-			model_predictions = np.concatenate((pause_probs, inv_probs), axis=-1)
+			model_predictions = np.concatenate((pause_probs, inv_probs, spec_probs), axis=-1)
 			voted_predictions = voter.predict(model_predictions)
 
 		val_accuracy = accuracy_score(np.argmax(y_val, axis=-1), voted_predictions)		
@@ -471,17 +471,96 @@ def ensemble(voting_type, models=None):
 
 		fold+=1
 
-	return train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_ensemble, val_accuracies_ensemble
+	return train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_spec, val_accuracies_spec, train_accuracies_ensemble, val_accuracies_ensemble
 
 def ensemble_boost_sampling(voting_type, loocv=False):
+
+	def spec_training(x_train, y_train, x_val, y_val, fold):
+
+		if loocv==True:
+			model_dir = 'loocv-models-spectrogram'
+		else:
+			model_dir = '5-fold-models-spectrogram'
+
+		epochs = 50
+		batch_size = 8
+
+		def create_model():
+			input_shape_ = (480, 640, 3)
+			model2_input = layers.Input(shape=input_shape_,  name='spectrogram_input')
+			model2_BN = layers.BatchNormalization()(model2_input)
+			
+			model2_hidden1 = layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
+								 activation='relu')(model2_BN)
+			# model2_hidden2 = layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
+			# 					 activation='relu')(model2_hidden1)
+			model2_BN1 = layers.BatchNormalization()(model2_hidden1)
+			model2_hidden2 = layers.MaxPool2D()(model2_BN1)
+			
+			model2_hidden3 = layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
+								 activation='relu')(model2_hidden2)
+			# model2_hidden4 = layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
+			# 					 activation='relu')(model2_hidden3)
+			model2_BN2 = layers.BatchNormalization()(model2_hidden3)
+			model2_hidden4 = layers.MaxPool2D()(model2_BN2)
+
+			model2_hidden5 = layers.Conv2D(64, kernel_size=(5, 5), strides=(1, 1),
+								 activation='relu')(model2_hidden4)
+			# model2_hidden6 = layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
+			# 					 activation='relu')(model2_hidden5)
+			model2_BN3 = layers.BatchNormalization()(model2_hidden5)
+			model2_hidden6 = layers.MaxPool2D()(model2_BN3)
+
+			model2_hidden7 = layers.Conv2D(128, kernel_size=(5, 5), strides=(1, 1),
+								 activation='relu')(model2_hidden6)
+			# model2_hidden8 = layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
+			# 					 activation='relu')(model2_hidden7)
+			model2_BN4 = layers.BatchNormalization()(model2_hidden7)
+			model2_hidden8 = layers.MaxPool2D()(model2_BN4)
+
+			model2_hidden9 = layers.Flatten()(model2_hidden8)
+			# model2_hidden10 = layers.Dropout(0.2)(model2_hidden9)
+			model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
+			model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
+			model2_output = layers.Dropout(0.2)(model2_hidden11)
+			model2_output = layers.Dense(2, activation='softmax')(model2_output)
+
+			model = Model(model2_input, model2_output)
+
+			return model
+
+		model = create_model()
+		checkpointer = tf.keras.callbacks.ModelCheckpoint(
+				os.path.join(model_dir, voting_type, 'spec_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
+				save_weights_only=False, mode='auto', save_freq='epoch')
+
+		model.compile(loss=tf.keras.losses.categorical_crossentropy,
+					  optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
+					  metrics=['categorical_accuracy'])
+		model.fit(x_train, y_train,
+				  batch_size=batch_size,
+				  epochs=epochs,
+				  verbose=1,
+				  callbacks=[checkpointer],
+				  validation_data=(x_val, y_val))
+		model = tf.keras.models.load_model(os.path.join(model_dir, voting_type, 'spec_{}.h5'.format(fold)))
+
+		train_score = model.evaluate(x_train, y_train, verbose=0)
+		train_accuracy = train_score[1]
+		train_loss = train_score[0]
+
+		val_score = model.evaluate(x_val, y_val, verbose=0)
+		print('Val accuracy:', val_score[1])
+		val_accuracy = val_score[1]
+		val_loss = val_score[0]
+
+		return train_accuracy, val_accuracy, train_loss, val_loss
 
 	def pause_training(x_train, y_train, x_val, y_val, fold):
 
 		if loocv==True:
-			n_split = X_pause.shape[0]
 			model_dir = 'loocv-models-pause'
 		else:
-			n_split = 5
 			model_dir = '5-fold-models-pause'
 
 		epochs = 600
@@ -535,14 +614,11 @@ def ensemble_boost_sampling(voting_type, loocv=False):
 	n_samples = X_pause.shape[0]
 	n_split = 5
 
-	# early_folds = list(range(n_samples % n_split))
-	# late_folds = [i for i in list(range(n_split)) if i not in early_folds]
-	# early_samples = n_samples // n_split + 1
-	# late_samples = n_samples // n_split
-
 	train_accuracies_inv, val_accuracies_inv, train_losses_inv, val_losses_inv, models_inv = intervention(X_intervention, y, filenames_intervention, voting_type)
 	train_accuracies_pause, val_accuracies_pause, train_losses_pause, val_losses_pause = [], [], [], []
+	train_accuracies_spec, val_accuracies_spec, train_losses_spec, val_losses_spec = [], [], [], []
 
+	# INTERVENTION -> PAUSE
 	for fold in range(1,6):
 
 		inv = tf.keras.models.load_model(os.path.join('5-fold-models-intervention', voting_type, 'intervention_{}.h5'.format(fold)))
@@ -560,15 +636,38 @@ def ensemble_boost_sampling(voting_type, loocv=False):
 		val_accuracies_pause.append(val_accuracy)
 		train_losses_pause.append(train_loss)
 		val_losses_pause.append(val_loss)
+		print('Train mean till fold {} is {}'.format(fold, np.mean(train_accuracies_pause)))
+		print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies_pause)))
 
-	train_accuracies_inv_, val_accuracies_inv_, train_accuracies_pause_, val_accuracies_pause_, train_accuracies_ensemble_, val_accuracies_ensemble_ = ensemble(voting_type, models='load')
+	# PAUSE -> SPECTROGRAM
+	for fold in range(1,6):
+
+		pause = tf.keras.models.load_model(os.path.join('5-fold-models-pause', voting_type, 'pause_{}.h5'.format(fold)))
+		pause_losses = []
+		for idx, x in enumerate(X_pause):
+			loss = pause.evaluate(np.expand_dims(x, axis=0), np.expand_dims(y[idx], axis=0), verbose=0)[0]
+			pause_losses.append(loss)
+		pause_probs = [float(i)/sum(pause_losses) for i in pause_losses] # normalizing losses into probs to sum to 1
+		train_index = np.random.choice(n_samples, (n_samples // n_split + 1)*(n_split-1), replace=False, p=pause_probs)
+		val_index = np.array([i for i in np.arange(n_samples) if i not in train_index])
+		spec_train, spec_val = X_spec[train_index], X_spec[val_index]
+		y_train, y_val = y[train_index], y[val_index]
+		train_accuracy, val_accuracy, train_loss, val_loss = spec_training(spec_train, y_train, spec_val, y_val, fold)
+		train_accuracies_spec.append(train_accuracy)
+		val_accuracies_spec.append(val_accuracy)
+		train_losses_spec.append(train_loss)
+		val_losses_spec.append(val_loss)
+		print('Train mean till fold {} is {}'.format(fold, np.mean(train_accuracies_spec)))
+		print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies_spec)))
+
+	train_accuracies_inv_, val_accuracies_inv_, _, _, _, _, train_accuracies_ensemble_, val_accuracies_ensemble_ = ensemble(voting_type, models='load')
 	if np.array_equal(train_accuracies_inv, train_accuracies_inv_) and np.array_equal(val_accuracies_inv, val_accuracies_inv_):
 		print('Interventions Accuracies verified')
 	else:
 		print('Interventions Accuracies different')
 		exit()
 	
-	return train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_ensemble_, val_accuracies_ensemble_
+	return train_accuracies_inv_, val_accuracies_inv_, train_accuracies_pause, val_accuracies_pause, train_accuracies_spec, val_accuracies_spec, train_accuracies_ensemble_, val_accuracies_ensemble_
 
 # def ensemble_boost_input(voting_type, loocv=False):
 
@@ -692,12 +791,13 @@ def one_model(longest_speaker_length, loocv=False): # nan loss
 	train_accuracies, val_accuracies, train_losses, val_losses, models = training()
 	return train_accuracies, val_accuracies, train_losses, val_losses, models
 
-
-train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_ensemble, val_accuracies_ensemble = ensemble_boost_sampling(voting_type='soft_voting')
+voting_type='hard_voting'
+# X_intervention, X_pause, X_spec, X_reg_intervention, X_reg_pause, y, y_reg, filenames_intervention, filenames_pause, filenames_spec = prepare_data()
+# spectrogram(X_spec, y, filenames_spec, voting_type, loocv=False)
+train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_spec, val_accuracies_spec, train_accuracies_ensemble, val_accuracies_ensemble = ensemble_boost_sampling(voting_type=voting_type)
 # one_model(longest_speaker_length=32)
 # ensemble(voting_type='soft_voting', models='load')
 #### PRINTING
-voting_type='soft_voting'
 for fold in range(5):
 	print('')
 	print('-'*50)
@@ -705,7 +805,7 @@ for fold in range(5):
 	print('-'*50)
 	print('Interventions :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(train_accuracies_inv[fold], val_accuracies_inv[fold]))
 	print('Pause :: \t Train Accuracy {:.3f} \t Val Accuracy: {:.3f}'.format(train_accuracies_pause[fold], val_accuracies_pause[fold]))
-	# print('Spectrogram :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(train_accuracies_spec[fold], val_accuracies_spec[fold]))
+	print('Spectrogram :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(train_accuracies_spec[fold], val_accuracies_spec[fold]))
 	print('Ensemble {} :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(voting_type, train_accuracies_ensemble[fold], val_accuracies_ensemble[fold]))
 
 print('')
@@ -714,6 +814,6 @@ print('Mean over all folds')
 print('-'*50)
 print('Interventions :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(np.mean(train_accuracies_inv), np.mean(val_accuracies_inv)))
 print('Pause :: \t Train Accuracy {:.3f} \t Val Accuracy: {:.3f}'.format(np.mean(train_accuracies_pause), np.mean(val_accuracies_pause)))
-# print('Spectrogram :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(np.mean(train_accuracies_spec), np.mean(val_accuracies_spec)))
+print('Spectrogram :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(np.mean(train_accuracies_spec), np.mean(val_accuracies_spec)))
 print('Ensemble {} :: \t Train Accuracy: {:.3f} \t Val Accuracy: {:.3f}'.format(voting_type, np.mean(train_accuracies_ensemble), np.mean(val_accuracies_ensemble)))
 
