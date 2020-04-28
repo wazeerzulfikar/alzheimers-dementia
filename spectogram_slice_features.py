@@ -401,7 +401,8 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		datagen = DataGenerator(x_train, y_train, batch_size)
 
 		loss = tf.keras.losses.CategoricalCrossentropy()
-		optimizer = tf.keras.optimizers.Adam(lr=1e-4)
+		# optimizer = tf.keras.optimizers.Adam(lr=1e-4)
+		optimizer = tf.keras.optimizers.SGD()
 
 		for epoch in range(epochs):
 
