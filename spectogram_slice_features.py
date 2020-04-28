@@ -44,7 +44,6 @@ y_cc = np.zeros((len(cc_files), 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd/*.npy')))
-X_cd = ([dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=timesteps_per_slice) for f in cd_files])
 y_cd = np.zeros((len(cd_files), 2))
 y_cd[:,1] = 1
 
@@ -81,23 +80,23 @@ class DataGenerator():
 		# 	self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
 		# 		horizontal_flip=True)
 
-	def random_crop(self, images, width_crop_size=320):
-		height, width, channels = images.shape[1:]
-		cropped_images = images
-		for i in range(len(images)):
-			if np.random.random()<0.5:
-				img = images[i]
-				pad_width_size = np.random.randint(0, width//4)
-				pad_start = np.random.randint(0, width - pad_width_size)
+	# def random_crop(self, images, width_crop_size=320):
+	# 	height, width, channels = images.shape[1:]
+	# 	cropped_images = images
+	# 	for i in range(len(images)):
+	# 		if np.random.random()<0.5:
+	# 			img = images[i]
+	# 			pad_width_size = np.random.randint(0, width//4)
+	# 			pad_start = np.random.randint(0, width - pad_width_size)
 
-				cropped_img_left = img[:, :pad_start, :]
-				cropped_img_right = img[:, pad_start+pad_width_size:, :]
-				padding = np.zeros((height, pad_width_size, channels))
-				cropped_img = np.concatenate((cropped_img_left, padding, cropped_img_right), axis=1)
+	# 			cropped_img_left = img[:, :pad_start, :]
+	# 			cropped_img_right = img[:, pad_start+pad_width_size:, :]
+	# 			padding = np.zeros((height, pad_width_size, channels))
+	# 			cropped_img = np.concatenate((cropped_img_left, padding, cropped_img_right), axis=1)
 
-				cropped_images[i] = cropped_img
+	# 			cropped_images[i] = cropped_img
 
-		return cropped_images
+	# 	return cropped_images
 
 
 	def get_n_batches(self):
@@ -260,7 +259,7 @@ def create_model(_type_ = 'convolutional'):
 		model_f.add(layers.BatchNormalization())
 		# model.add(layers.Dense(16, activation='relu'))
 		model_f.add(layers.Dropout(0.2))
-		model_f.add(layers.Dense(num_classes, activation='softmax'))
+		model_f.add(layers.Dense(num_classes, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 
 		return model_f
 
@@ -325,6 +324,8 @@ n_split = 5
 epochs = 40
 batch_size = 8
 
+model_dir = '5-fold-models-spectrogram-slice'
+
 val_accuracies = []
 train_accuracies = []
 fold = 0
@@ -364,6 +365,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		x_train = x_train_new
 
 		x_val = [dataset_features.get_spectogram_features(f) for f in filenames_val]
+		x_val_sliced = [dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=timesteps_per_slice) for f in filenames_val]
 
 	model = create_model(_type_='cnn_lstm')
 
@@ -377,7 +379,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			  metrics=['categorical_accuracy'])
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			'best_model_spec_2_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=False,
+			os.path.join(model_dir, 'spec_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=False,
 			save_weights_only=False, mode='auto', save_freq='epoch'
 		)
 
@@ -399,7 +401,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		datagen = DataGenerator(x_train, y_train, batch_size)
 
 		loss = tf.keras.losses.CategoricalCrossentropy()
-		optimizer = tf.keras.optimizers.Adam(lr=1e-3)
+		optimizer = tf.keras.optimizers.Adam(lr=1e-4)
 
 		for epoch in range(epochs):
 
@@ -449,17 +451,19 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			epoch_loss_avg.reset_states()
 			epoch_accuracy.reset_states()
 
-			print()
 			print('Val Epoch first timesteps_per_slice')
 			progbar = tf.keras.utils.Progbar(len(x_val), stateful_metrics=['epoch', 'val_loss', 'val_acc'])
 			progbar.update(0, [('epoch', epoch)])
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
 
-			for x_val_batch, y_val_batch in zip(x_val, y_val):
-				x_val_batch_ = x_val_batch_[:,:timesteps_per_slice,:]
-				x_val_batch_ = np.reshape(x_val_batch_, (-1, 128, 128, 1))
-				pred = model(np.expand_dims(x_val_batch_, axis=0), training=False)
+			for x_val_batch, y_val_batch in zip(x_val_sliced, y_val):
+				x_val_batch_ = np.reshape(x_val_batch, (-1, timesteps_per_slice//128, 128, 128, 1))
+				preds = model(x_val_batch_, training=False)
+				# preds = np.argmax(preds, axis=-1)
+				# preds_values, counts = np.unique(preds, return_counts=True)
+				# preds = preds_values[np.argmax(counts)]
+				preds = np.mean(preds, axis=0)
 				loss_value = loss(y_val_batch, pred)
 				acc = tf.keras.metrics.categorical_accuracy(y_val_batch, pred)
 				epoch_loss_avg.update_state(loss_value)  # Add current batch loss
@@ -471,7 +475,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			epoch_accuracy.reset_states()
 			print()
 
-	model = tf.keras.models.load_model('best_model_spec_2_{}.h5'.format(fold))
+	model = tf.keras.models.load_model(os.path.join(model_dir, 'spec_{}.h5'.format(fold)))
 
 	val_pred = model.predict(x_val)
 	for i in range(len(x_val)):
