@@ -18,12 +18,12 @@ import dataset_features, dataset_utils
 def prepare_data():
     dataset_dir = '../ADReSS-IS2020-data/train/'
 
-    cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_cc/*.csv')))
+    cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_features/compare_cc/*.csv')))
     all_speakers_cc = []
     for filename in cc_files:
         all_speakers_cc.append(dataset_features.get_compare_features(filename))
 
-    cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_cd/*.csv')))
+    cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_features/compare_cd/*.csv')))
     all_speakers_cd = []
     for filename in cd_files:
         all_speakers_cd.append(dataset_features.get_compare_features(filename))
