@@ -148,7 +148,7 @@ def training(loocv=False):
 def training_on_entire_dataset(X, y, longest_speaker_length):
 
     epochs = 400
-    batch_size = 8  
+    batch_size = 8
 
     model = create_model(longest_speaker_length)
     model.compile(loss=tf.keras.losses.categorical_crossentropy,
@@ -207,8 +207,8 @@ def regression():
         print('\n######################### FOLD {} #########################\n'.format(fold))
         x_train, x_val = X_reg[train_index], X_reg[val_index]
         y_train, y_val = y_reg[train_index], y_reg[val_index]
-        
-        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))    
+
+        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))
         model.pop()
         for layer in model.layers:
             layer.trainable = False
@@ -276,7 +276,7 @@ def regression():
     print('Train Scores ', train_scores)
     print('Train mean', np.mean(train_scores))
     print('Train std', np.std(train_scores))
-    
+
     print()
     print('Val accuracies ', val_scores)
     print('Val mean', np.mean(val_scores))
@@ -310,4 +310,3 @@ training(loocv=True)
 #     print('F1 score {:.3f}'.format(f1_score))
 #     print('Precision {:.3f}'.format(precision))
 #     print('Recall {:.3f}'.format(recall))
-
