@@ -65,65 +65,48 @@ num_classes = 2
 
 class DataGenerator():
 
-	def __init__(self, X_spectrograms, y, batch_size, split='train'):
+	def __init__(self, filenames, y, batch_size, split='train'):
 
-		self.X_spectrograms = X_spectrograms
+		self.filenames = filenames
 		# self.X_interventions = X_interventions
 		self.y = y
 		self.batch_size = batch_size
-		self.n_samples = self.X_spectrograms.shape[0]
-		# if split=='train':
-		# 	self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-		# 		horizontal_flip=True)
-
-		# elif split=='val':
-		# 	self.datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-		# 		horizontal_flip=True)
-
-	# def random_crop(self, images, width_crop_size=320):
-	# 	height, width, channels = images.shape[1:]
-	# 	cropped_images = images
-	# 	for i in range(len(images)):
-	# 		if np.random.random()<0.5:
-	# 			img = images[i]
-	# 			pad_width_size = np.random.randint(0, width//4)
-	# 			pad_start = np.random.randint(0, width - pad_width_size)
-
-	# 			cropped_img_left = img[:, :pad_start, :]
-	# 			cropped_img_right = img[:, pad_start+pad_width_size:, :]
-	# 			padding = np.zeros((height, pad_width_size, channels))
-	# 			cropped_img = np.concatenate((cropped_img_left, padding, cropped_img_right), axis=1)
-
-	# 			cropped_images[i] = cropped_img
-
-	# 	return cropped_images
+		self.n_samples = self.filenames.shape[0]
+		self.timesteps_per_slice = 1024
 
 
 	def get_n_batches(self):
 		return self.n_samples//self.batch_size
 
-	# def run_on_batch(self, batch, aug, prob=0.0):
-	#   aug_images = []
-	#   for img in batch:
-	#       if np.random.random()<prob:
-	#           aug_images.append(aug(img[None,...]))
-	#       else:
-	#           aug_images.append(img)
 
 	def flow(self):
 
-		p = np.random.permutation(len(self.X_spectrograms))
-		self.X_spectrograms = self.X_spectrograms[p]
+		p = np.random.permutation(len(self.filenames))
+		self.filenames = self.filenames[p]
 		self.y = self.y[p]
 		batch_n = 0
 		for batch_id in range(self.get_n_batches()):
-			x_batch_spectograms = self.X_spectrograms[batch_n:batch_n+batch_size]
-			# x_batch_spectograms = tf.ragged.constant(x_batch_spectograms)
-
+			batch_filenames = self.filenames[batch_n:batch_n+batch_size]
 			y_batch = self.y[batch_n:batch_n+batch_size]
+
+			x_train = [dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=self.timesteps_per_slice)
+			 for f in batch_filenames]
+			y_batch_new = []
+			x_batch = []
+			for e,s in enumerate(x_train):
+				label = y_batch[e]
+				for i in range(s.shape[0]):
+					y_batch_new.append(label)
+				if e == 0:
+					x_batch = np.reshape(s, (s.shape[0], self.timesteps_per_slice//128, 128, 128, 1))
+				else:
+					x_batch = np.concatenate((x_batch, 
+					 np.reshape(s, (s.shape[0], self.timesteps_per_slice//128, 128, 128, 1))), axis=0)
+			y_batch = np.array(y_batch_new)
+
 			batch_n += self.batch_size
 
-			yield (x_batch_spectograms, y_batch)
+			yield (x_batch, y_batch)
 
 	def on_epoch_end():
 		print('Epoch Done!')
@@ -335,7 +318,7 @@ train_loop = 'custom'
 
 spectogram_type = 'sliced'
 
-@tf.function
+# @tf.function
 def custom_train_step(x_train, y_train):
 	with tf.GradientTape() as tape:
 		predictions = model(x_train, training=True)
@@ -349,23 +332,9 @@ for train_index, val_index in KFold(n_split).split(filenames):
 	y_train, y_val = y[train_index], y[val_index]
 	filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
-	if spectogram_type == 'sliced':
-		x_train = [dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=timesteps_per_slice) for f in filenames_train]
-		y_train_new = []
-		x_train_new = []
-		for e,s in enumerate(x_train):
-			label = y_train[e]
-			for i in range(s.shape[0]):
-				y_train_new.append(label)
-			if e == 0:
-				x_train_new = np.reshape(s, (s.shape[0], timesteps_per_slice//128, 128, 128, 1))
-			else:
-				x_train_new = np.concatenate((x_train_new,  np.reshape(s, (s.shape[0], timesteps_per_slice//128, 128, 128, 1))), axis=0)
-		y_train = np.array(y_train_new)
-		x_train = x_train_new
-
-		x_val = [dataset_features.get_spectogram_features(f) for f in filenames_val]
-		x_val_sliced = [dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=timesteps_per_slice) for f in filenames_val]
+	# if spectogram_type == 'sliced':
+	# 	x_val = [dataset_features.get_spectogram_features(f) for f in filenames_val]
+	# 	x_val_sliced = [dataset_features.get_sliced_spectogram_features(f, timesteps_per_slice=timesteps_per_slice) for f in filenames_val]
 
 	model = create_model(_type_='cnn_lstm')
 
@@ -398,7 +367,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		# 		  validation_data=(x_val, y_val))
 
 	elif train_loop == 'custom':
-		datagen = DataGenerator(x_train, y_train, batch_size)
+		datagen = DataGenerator(filenames_train, y_train, batch_size)
 
 		loss = tf.keras.losses.CategoricalCrossentropy()
 		optimizer = tf.keras.optimizers.Adam(lr=1e-4)
@@ -406,7 +375,7 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		for epoch in range(epochs):
 
 			print('Train Epoch')
-			progbar = tf.keras.utils.Progbar(len(x_train), stateful_metrics=['epoch', 'train_loss', 'train_acc'])
+			progbar = tf.keras.utils.Progbar(len(filenames_train), stateful_metrics=['epoch', 'train_loss', 'train_acc'])
 			progbar.update(0, [('epoch', epoch)])
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
@@ -436,11 +405,12 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
 
-			for x_val_batch, y_val_batch in zip(x_val, y_val):
-				x_val_batch_ = x_val_batch[:,:-(x_val_batch.shape[1]%128),:]
+			for x_val_batch_filename, y_val_batch in zip(filenames_val, y_val):
+				x_val_batch = [dataset.get_spectogram_features(x_val_batch_filename)]
+				x_val_batch = x_val_batch[:,:-(x_val_batch.shape[1]%128),:]
 				# x_val_batch_ = x_val_batch_[:,:1024,:]
-				x_val_batch_ = np.reshape(x_val_batch_, (-1, 128, 128, 1))
-				pred = model(np.expand_dims(x_val_batch_, axis=0), training=False)
+				x_val_batch = np.reshape(x_val_batch, (-1, 128, 128, 1))
+				pred = model(np.expand_dims(x_val_batch, axis=0), training=False)
 				loss_value = loss(y_val_batch, pred)
 				acc = tf.keras.metrics.categorical_accuracy(y_val_batch, pred)
 				epoch_loss_avg.update_state(loss_value)  # Add current batch loss
@@ -457,9 +427,10 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
 
-			for x_val_batch, y_val_batch in zip(x_val_sliced, y_val):
-				x_val_batch_ = np.reshape(x_val_batch, (-1, timesteps_per_slice//128, 128, 128, 1))
-				preds = model(x_val_batch_, training=False)
+			for x_val_batch_filename, y_val_batch in zip(filenames_val, y_val):
+				x_val_batch = dataset_features.get_sliced_spectogram_features(x_val_batch_filename, timesteps_per_slice=timesteps_per_slice)
+				x_val_batch = np.reshape(x_val_batch, (-1, timesteps_per_slice//128, 128, 128, 1))
+				preds = model(x_val_batch, training=False)
 				# preds = np.argmax(preds, axis=-1)
 				# preds_values, counts = np.unique(preds, return_counts=True)
 				# preds = preds_values[np.argmax(counts)]
