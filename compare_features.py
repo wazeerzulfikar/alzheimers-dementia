@@ -25,7 +25,7 @@ def select_bestK_features(X, y, n):
     X_selected = fs.transform(X)
     return X_selected, fs
 
-def pca_features(X, y, n):
+def pca_features(X, n):
     sc = StandardScaler()
     X_scaled = sc.fit_transform(X)
     pca = PCA(n_components=n)
@@ -47,12 +47,12 @@ def plot_selected_features_scores(X, y, n='all'):
 def prepare_data(features_size):
     dataset_dir = '../ADReSS-IS2020-data/train/'
 
-    cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_features/compare_cc/*.csv')))
+    cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cc/*.csv')))
     all_speakers_cc = []
     for filename in cc_files:
         all_speakers_cc.append(dataset_features.get_compare_features(filename))
 
-    cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare_features/compare_cd/*.csv')))
+    cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cd/*.csv')))
     all_speakers_cd = []
     for filename in cd_files:
         all_speakers_cd.append(dataset_features.get_compare_features(filename))
@@ -74,7 +74,8 @@ def prepare_data(features_size):
     y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
     # X, _ = select_bestK_features(X, y, features_size)
     # X = pca_features(X, y, features_size)
-    X = lda_features(X, y, features_size)
+
+    # X = lda_features(X, y, features_size)
 
     X_reg = np.copy(X)
     y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
@@ -90,21 +91,21 @@ def prepare_data(features_size):
 
 def create_model(features_size):
     INP = layers.Input(shape=(features_size,))
-    BN1 = layers.BatchNormalization()(INP)
+    # BN1 = layers.BatchNormalization()(INP)
 
-    D1 = layers.Dense(16, activation='relu')(BN1)
+    D1 = layers.Dense(16, activation='relu')(INP)
     BN2 = layers.BatchNormalization()(D1)
-    DP1 = layers.Dropout(0.5)(BN2)
+    DP1 = layers.Dropout(0.2)(BN2)
 
-    D2 = layers.Dense(32, activation='relu')(DP1)
+    D2 = layers.Dense(8, activation='relu')(DP1)
     BN3 = layers.BatchNormalization()(D2)
-    DP2 = layers.Dropout(0.5)(BN3)
+    DP2 = layers.Dropout(0.2)(BN3)
 
-    D3 = layers.Dense(32, activation='relu')(DP2)
-    BN4 = layers.BatchNormalization()(D3)
-    DP3 = layers.Dropout(0.5)(BN4)
+    # D3 = layers.Dense(16, activation='relu',  activity_regularizer=tf.keras.regularizers.l1(0.01))(DP2)
+    # BN4 = layers.BatchNormalization()(D3)
+    # DP3 = layers.Dropout(0.2)(BN4)
 
-    D4 = layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01))(DP3)
+    D4 = layers.Dense(2, activation='softmax')( DP2)
 
     model = Model(INP, D4)
     return model
@@ -114,7 +115,9 @@ def training(loocv=False):
 
     epochs = 600
     batch_size = 8
-    features_size = 1
+    features_size = 21
+    # features_size = 16
+
     val_accuracies = []
     train_accuracies = []
 
@@ -137,8 +140,25 @@ def training(loocv=False):
         y_train, y_val = y[train_index], y[val_index]
         filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
+        sc = StandardScaler()
+        sc.fit(x_train)
+
+        x_train = sc.transform(x_train)
+        x_val = sc.transform(x_val)
+
+        pca = PCA(n_components=features_size)
+        pca.fit(x_train)
+
+        # e = pca.explained_variance_ratio_
+        # for i in sorted(e)[::-1][:108]:
+        #     print(i)
+        # exit()
+
+        x_train = pca.transform(x_train)
+        x_val = pca.transform(x_val)
 
         model = create_model(features_size)
+        # print(model.summary());exit()
 
         model.compile(loss=tf.keras.losses.categorical_crossentropy,
                         optimizer=tf.keras.optimizers.Adam(lr=0.001),
@@ -184,6 +204,7 @@ def training_on_entire_dataset():
     epochs = 600
     batch_size = 8
     features_size = 6373
+    # features_size = 1024
     X, y, _, _, filenames = prepare_data(features_size)
 
     model = create_model(features_size)
@@ -192,8 +213,8 @@ def training_on_entire_dataset():
                         metrics=['categorical_accuracy'])
 
     checkpointer = tf.keras.callbacks.ModelCheckpoint(
-            'best_model_compare.h5', monitor='loss', verbose=0, save_best_only=True,
-            save_weights_only=False, mode='auto', save_freq='epoch')
+            'best_model_compare.h5', monitor='val_categorical_accuracy', verbose=0, save_best_only=True,
+            save_weights_only=False, mode='max', save_freq='epoch')
 
     model.fit(X, y,
                 batch_size=batch_size,
