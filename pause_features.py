@@ -7,6 +7,8 @@ import glob
 import os
 import numpy as np
 np.random.seed(0)
+n_ = 108
+p = np.random.permutation(n_)
 
 import time
 import re
@@ -67,14 +69,12 @@ def prepare_data():
 	y = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 	filenames = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
 	#######################
-
-	p = np.random.permutation(len(X))
+	
 	X, X_reg = X[p], X_reg[p]
 	y, y_reg = y[p], y_reg[p]
 	filenames = filenames[p]
 
 	return X, y, X_reg, y_reg, filenames
-
 
 def create_model():
 	# model = tf.keras.Sequential()
@@ -117,21 +117,25 @@ def regression_baseline():
 	print()
 	print(np.argmin(values), np.min(values)) # 23 	7.18279838173066
 
+def regression(loocv=False):
 
-def regression(models):
-	'''
-	models is a list of loaded models
-	'''
-
-	_, _, X_reg, y_reg, _ = prepare_data()
+	X, y, X_reg, y_reg, _ = prepare_data()
 	fold = 0
-	n_split = 5
 	epochs = 1500
 	batch_size = 8
 
+	if loocv==True:
+		n_split = X_reg.shape[0]
+		model_dir = 'loocv-models-pause'
+	else:
+		n_split = 5
+		model_dir = '5-fold-models-pause'
+
 	train_scores, val_scores = [], []
+	val_rounded_scores = []
 	all_train_predictions, all_val_predictions = [], []
 	all_train_true, all_val_true = [], []
+	train_accuracies, val_accuracies = [], [] # classification
 
 	for train_index, val_index in KFold(n_split).split(X_reg):
 
@@ -142,7 +146,9 @@ def regression(models):
 		x_train, x_val = X_reg[train_index], X_reg[val_index]
 		y_train, y_val = y_reg[train_index], y_reg[val_index]
 
-		model = models[fold-1]
+		model = tf.keras.models.load_model(os.path.join(model_dir, 'pause_{}.h5'.format(fold)))
+		train_accuracies.append(model.evaluate(X[train_index], y[train_index], verbose=0)[1])
+		val_accuracies.append(model.evaluate(X[val_index], y[val_index], verbose=0)[1])
 		model.pop()
 		for layer in model.layers:
 			layer.trainable = False
@@ -160,7 +166,7 @@ def regression(models):
 			optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
-						'best_model_reg_{}.h5'.format(fold), monitor='loss', verbose=0, save_best_only=True,
+						os.path.join(model_dir, 'pause_reg_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
 						save_weights_only=False, mode='auto', save_freq='epoch')
 
 		model_reg.fit(x_train, y_train,
@@ -170,7 +176,7 @@ def regression(models):
 							callbacks=[checkpointer],
 							validation_data=(x_val, y_val))
 
-		model_reg = tf.keras.models.load_model('best_model_reg_{}.h5'.format(fold))
+		model_reg = tf.keras.models.load_model(os.path.join(model_dir, 'pause_reg_{}.h5'.format(fold)))
 		# models.append(model)
 		train_score = math.sqrt(model_reg.evaluate(x_train, y_train, verbose=0))
 		train_scores.append(train_score)
@@ -182,6 +188,13 @@ def regression(models):
 		all_val_predictions.append(val_predictions)
 		all_train_true.append(y_train)
 		all_val_true.append(y_val)
+		val_rounded_scores.append(math.sqrt(np.mean(list(map(lambda i: (round(val_predictions[i,0]) - y_val[i])**2, list(range(val_predictions.shape[0])))))))
+
+		print()
+		print('Val score:', val_score)
+		print('Val score mean till fold {} is {}'.format(fold, np.mean(val_scores)))
+		print('Val rounded score mean till fold {} is {}'.format(fold, np.mean(val_rounded_scores)))
+		print()
 		
 
 	print()
@@ -208,10 +221,25 @@ def regression(models):
 	print('Train std', np.std(train_scores))
 	
 	print()
-	print('Val accuracies ', val_scores)
+	print('Val Scores ', val_scores)
 	print('Val mean', np.mean(val_scores))
 	print('Val std', np.std(val_scores))
 
+	print()
+	print('Val rounded Scores ', val_rounded_scores)
+	print('Val rounded mean', np.mean(val_rounded_scores))
+	print('Val rounded std', np.std(val_rounded_scores))
+
+	print()
+	print('################# CLASSIFICATION #################')
+	print('Train accuracies ', train_accuracies)
+	print('Train mean', np.mean(train_accuracies))
+	print('Train std', np.std(train_accuracies))
+
+	print()
+	print('Val accuracies ', val_accuracies)
+	print('Val mean', np.mean(val_accuracies))
+	print('Val std', np.std(val_accuracies))
 
 def training(loocv=False):
 
@@ -313,12 +341,9 @@ def training_on_entire_dataset():
 
 
 
+# models = training(loocv=False)
 
-models = training(loocv=True)
-
-# models = [tf.keras.models.load_model('best_model_pause_{}.h5'.format(fold)) for fold in range(1,6)]
-# print(models)
-# regression(models)
+regression(loocv=False)
 
 # regression_baseline()
 
