@@ -6,6 +6,8 @@ import numpy as np
 import csv
 import time
 np.random.seed(0)
+n_ = 108
+p = np.random.permutation(n_)
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -19,30 +21,30 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 import dataset_features, dataset_utils
 
-def select_bestK_features(X, y, n):
-    fs = SelectKBest(score_func=f_classif, k=n)
-    fs.fit(X, np.argmax(y, axis=1))
-    X_selected = fs.transform(X)
-    return X_selected, fs
+# def select_bestK_features(X, y, n):
+#     fs = SelectKBest(score_func=f_classif, k=n)
+#     fs.fit(X, np.argmax(y, axis=1))
+#     X_selected = fs.transform(X)
+#     return X_selected, fs
 
-def pca_features(X, n):
-    sc = StandardScaler()
-    X_scaled = sc.fit_transform(X)
-    pca = PCA(n_components=n)
-    X_selected = pca.fit_transform(X_scaled)
-    return X_selected
+# def pca_features(X, n):
+#     sc = StandardScaler()
+#     X_scaled = sc.fit_transform(X)
+#     pca = PCA(n_components=n)
+#     X_selected = pca.fit_transform(X_scaled)
+#     return X_selected
 
-def lda_features(X, y, n):
-    sc = StandardScaler()
-    X_scaled = sc.fit_transform(X)
-    lda = LDA(n_components=n)
-    X_selected = lda.fit_transform(X_scaled, np.argmax(y, axis=1))
-    return X_selected
+# def lda_features(X, y, n):
+#     sc = StandardScaler()
+#     X_scaled = sc.fit_transform(X)
+#     lda = LDA(n_components=n)
+#     X_selected = lda.fit_transform(X_scaled, np.argmax(y, axis=1))
+#     return X_selected
 
-def plot_selected_features_scores(X, y, n='all'):
-    _, fs = select_bestK_features(X, y, n)
-    pyplot.bar([i for i in range(len(fs.scores_))], fs.scores_)
-    pyplot.show()
+# def plot_selected_features_scores(X, y, n='all'):
+#     _, fs = select_bestK_features(X, y, n)
+#     pyplot.bar([i for i in range(len(fs.scores_))], fs.scores_)
+#     pyplot.show()
 
 def prepare_data(features_size):
     dataset_dir = '../ADReSS-IS2020-data/train/'
@@ -82,7 +84,6 @@ def prepare_data(features_size):
 
     filenames = np.concatenate((cc_files, cd_files), axis=0)
 
-    p = np.random.permutation(len(X))
     X, X_reg = X[p], X_reg[p]
     y, y_reg = y[p], y_reg[p]
     filenames = filenames[p]
