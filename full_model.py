@@ -384,11 +384,11 @@ def ensemble(voting_type, models=None):
 	
 	X_intervention, X_pause, X_spec, X_reg_intervention, X_reg_pause, y, y_reg, filenames_intervention, filenames_pause, filenames_spec = prepare_data()
 
-	if models==None:
+	if models==None: # trains all and returns models for voting
 		train_accuracies_inv, val_accuracies_inv, train_losses_inv, val_losses_inv, models_inv = intervention(X_intervention, y, filenames_intervention, voting_type)
 		train_accuracies_pause, val_accuracies_pause, train_losses_pause, val_losses_pause, models_pause = pause(X_pause, y, filenames_pause, voting_type)
 		train_accuracies_spec, val_accuracies_spec, train_losses_spec, val_losses_spec, models_spec = spectrogram(X_spec, y, filenames_spec, voting_type)
-	elif models=='load':
+	elif models=='load': # loads models and return them for voting
 		models_inv, models_pause, models_spec = [], [], []
 		train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_spec, val_accuracies_spec = [], [], [], [], [], []
 		fold = 0
@@ -796,7 +796,7 @@ voting_type='hard_voting'
 # spectrogram(X_spec, y, filenames_spec, voting_type, loocv=False)
 train_accuracies_inv, val_accuracies_inv, train_accuracies_pause, val_accuracies_pause, train_accuracies_spec, val_accuracies_spec, train_accuracies_ensemble, val_accuracies_ensemble = ensemble_boost_sampling(voting_type=voting_type)
 # one_model(longest_speaker_length=32)
-# ensemble(voting_type='soft_voting', models='load')
+# ensemble(voting_type=voting_type, models='load')
 #### PRINTING
 for fold in range(5):
 	print('')

@@ -79,8 +79,8 @@ def training(loocv=False):
 
     epochs = 400
     batch_size = 8
-    val_accuracies = []
-    train_accuracies = []
+    val_accuracies, val_losses = [], []
+    train_accuracies, train_losses = [], []
     fold = 0
 
     print(create_model(longest_speaker_length).summary())
@@ -120,20 +120,30 @@ def training(loocv=False):
 
         train_score = model.evaluate(x_train, y_train, verbose=0)
         train_accuracies.append(train_score[1])
+        train_losses.append(train_score[0])
 
         val_score = model.evaluate(x_val, y_val, verbose=0)
         print('Val accuracy:', val_score[1])
         val_accuracies.append(val_score[1])
+        val_losses.append(val_score[0])
         print('Val mean till fold {} is {}'.format(fold, np.mean(val_accuracies)))
 
+    print()
     print('Train accuracies ', train_accuracies)
     print('Train mean', np.mean(train_accuracies))
     print('Train std', np.std(train_accuracies))
-
-
+    print()
+    print('Train losses ', train_losses)
+    print('Train mean', np.mean(train_losses))
+    print('Train std', np.std(train_losses))
+    print()
     print('Val accuracies ', val_accuracies)
     print('Val mean', np.mean(val_accuracies))
     print('Val std', np.std(val_accuracies))
+    print()
+    print('Val losses ', val_losses)
+    print('Val mean', np.mean(val_losses))
+    print('Val std', np.std(val_losses))
 
 def training_on_entire_dataset(X, y, longest_speaker_length):
 
