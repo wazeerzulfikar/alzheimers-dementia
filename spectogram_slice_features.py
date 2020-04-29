@@ -19,8 +19,10 @@ import os
 import glob
 import time
 
-# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"]="3"
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# tf.config.experimental.set_memory_growth(gpus[0], True)
 
 import numpy as np
 np.random.seed(0)
@@ -107,6 +109,8 @@ class DataGenerator():
 			batch_n += self.batch_size
 
 			yield (x_batch, y_batch)
+			# for x_, y_ in zip(x_batch, y_batch):
+			# 	yield (np.expand_dims(x_, axis=0), np.expand_dims(y_, axis=0))
 
 	def on_epoch_end():
 		print('Epoch Done!')
@@ -238,11 +242,11 @@ def create_model(_type_ = 'convolutional'):
 		model_f.add(layers.TimeDistributed(layers.BatchNormalization()))
 
 		model_f.add(layers.TimeDistributed(layers.Lambda(lambda x: tf.reduce_max(x, axis=[1,2]))))
-		model_f.add(layers.Bidirectional(layers.LSTM(32)))
+		model_f.add(layers.Bidirectional(layers.LSTM(32, activation='sigmoid')))
 		model_f.add(layers.BatchNormalization())
 		# model.add(layers.Dense(16, activation='relu'))
-		model_f.add(layers.Dropout(0.2))
-		model_f.add(layers.Dense(num_classes, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+		# model_f.add(layers.Dropout(0.2))
+		model_f.add(layers.Dense(num_classes, activation='softmax'))
 
 		return model_f
 
@@ -305,7 +309,7 @@ print(model.summary())
 n_split = 5
 
 epochs = 40
-batch_size = 8
+batch_size = 1
 
 model_dir = '5-fold-models-spectrogram-slice'
 
@@ -318,7 +322,7 @@ train_loop = 'custom'
 
 spectogram_type = 'sliced'
 
-# @tf.function
+@tf.function(experimental_relax_shapes=True)
 def custom_train_step(x_train, y_train):
 	with tf.GradientTape() as tape:
 		predictions = model(x_train, training=True)
@@ -338,11 +342,15 @@ for train_index, val_index in KFold(n_split).split(filenames):
 
 	model = create_model(_type_='cnn_lstm')
 
+	# model = tf.keras.models.load_model('spec_slice.h5')
+
 	timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 	log_name = "{}".format(timeString)
 
 
 	if train_loop == 'builtin':
+		datagen = DataGenerator(filenames_train, y_train, batch_size)
+
 		model.compile(loss=tf.keras.losses.categorical_crossentropy,
 			  optimizer=tf.keras.optimizers.Adam(lr=1e-3),
 			  metrics=['categorical_accuracy'])
@@ -352,9 +360,8 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			save_weights_only=False, mode='auto', save_freq='epoch'
 		)
 
-		model.fit(x_train, y_train,
+		model.fit(datagen.flow(),
 				  epochs=epochs,
-				  batch_size=batch_size,
 				  verbose=1,
 				  callbacks=[checkpointer])
 				  # validation_data=(x_val, y_val))
@@ -370,8 +377,8 @@ for train_index, val_index in KFold(n_split).split(filenames):
 		datagen = DataGenerator(filenames_train, y_train, batch_size)
 
 		loss = tf.keras.losses.CategoricalCrossentropy()
-		# optimizer = tf.keras.optimizers.Adam(lr=1e-4)
-		optimizer = tf.keras.optimizers.SGD()
+		optimizer = tf.keras.optimizers.Adam(lr=1e-4)
+		# optimizer = tf.keras.optimizers.SGD()
 
 		for epoch in range(epochs):
 
@@ -401,13 +408,13 @@ for train_index, val_index in KFold(n_split).split(filenames):
 
 			print()
 			print('Val Epoch')
-			progbar = tf.keras.utils.Progbar(len(x_val), stateful_metrics=['epoch', 'val_loss', 'val_acc'])
+			progbar = tf.keras.utils.Progbar(len(filenames_val), stateful_metrics=['epoch', 'val_loss'])
 			progbar.update(0, [('epoch', epoch)])
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
 
 			for x_val_batch_filename, y_val_batch in zip(filenames_val, y_val):
-				x_val_batch = [dataset.get_spectogram_features(x_val_batch_filename)]
+				x_val_batch = np.array(dataset_features.get_spectogram_features(x_val_batch_filename))
 				x_val_batch = x_val_batch[:,:-(x_val_batch.shape[1]%128),:]
 				# x_val_batch_ = x_val_batch_[:,:1024,:]
 				x_val_batch = np.reshape(x_val_batch, (-1, 128, 128, 1))
@@ -423,29 +430,43 @@ for train_index, val_index in KFold(n_split).split(filenames):
 			epoch_accuracy.reset_states()
 
 			print('Val Epoch first timesteps_per_slice')
-			progbar = tf.keras.utils.Progbar(len(x_val), stateful_metrics=['epoch', 'val_loss', 'val_acc'])
+			progbar = tf.keras.utils.Progbar(len(filenames_val), stateful_metrics=['epoch', 'val_loss', 'val_acc', 'voting_acc'])
 			progbar.update(0, [('epoch', epoch)])
 			epoch_loss_avg = tf.keras.metrics.Mean()
 			epoch_accuracy = tf.keras.metrics.Mean()
+			voting_epoch_accuracy = tf.keras.metrics.Mean()
 
 			for x_val_batch_filename, y_val_batch in zip(filenames_val, y_val):
-				x_val_batch = dataset_features.get_sliced_spectogram_features(x_val_batch_filename, timesteps_per_slice=timesteps_per_slice)
+				x_val_batch = np.array(dataset_features.get_sliced_spectogram_features(x_val_batch_filename, timesteps_per_slice=timesteps_per_slice))
 				x_val_batch = np.reshape(x_val_batch, (-1, timesteps_per_slice//128, 128, 128, 1))
 				preds = model(x_val_batch, training=False)
+				mean_preds = np.mean(preds, axis=0)
+				loss_value = loss(y_val_batch, mean_preds)
+				acc = tf.keras.metrics.categorical_accuracy(y_val_batch, mean_preds)
+
 				# preds = np.argmax(preds, axis=-1)
+				# print(preds)
 				# preds_values, counts = np.unique(preds, return_counts=True)
+				# print(preds_values, counts)
+				# preds = [list(map(lambda x: 0.0 if x <0.5 else 1.0, i)) for i in preds]
+				preds = np.argmax(preds, axis=-1)
+				preds_values, counts = np.unique(preds, return_counts=True)
+				# print(preds_values, counts)
+				# print(preds)
 				# preds = preds_values[np.argmax(counts)]
-				preds = np.mean(preds, axis=0)
-				loss_value = loss(y_val_batch, pred)
-				acc = tf.keras.metrics.categorical_accuracy(y_val_batch, pred)
+				voting_acc = tf.keras.metrics.categorical_accuracy(y_val_batch, preds)
 				epoch_loss_avg.update_state(loss_value)  # Add current batch loss
 				epoch_accuracy.update_state(acc)
+				voting_epoch_accuracy.update_state(voting_acc)
 				progbar.add(1, [('val_loss', epoch_loss_avg.result()),
-					('val_acc', epoch_accuracy.result())])
+					('val_acc', epoch_accuracy.result()),
+					('voting_acc', voting_epoch_accuracy.result())])
 
 			epoch_loss_avg.reset_states()
 			epoch_accuracy.reset_states()
+			voting_epoch_accuracy.reset_states()
 			print()
+			model.save('spec_slice.h5')
 
 	model = tf.keras.models.load_model(os.path.join(model_dir, 'spec_{}.h5'.format(fold)))
 
@@ -456,10 +477,10 @@ for train_index, val_index in KFold(n_split).split(filenames):
 	train_score = model.evaluate(x_train, y_train, verbose=0)
 	# print('_'*30)
 	# print(model.predict(x_train))
-	# print(model.predict(x_val))
+	# print(model.predict(filenames_val))
 
 	train_accuracies.append(train_score[1])
-	score = model.evaluate(x_val, y_val, verbose=0)
+	score = model.evaluate(filenames_val, y_val, verbose=0)
 	print('Val accuracy:', score[1])
 	val_accuracies.append(score[1])
 
