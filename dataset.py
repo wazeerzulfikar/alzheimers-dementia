@@ -108,7 +108,23 @@ def prepare_data(dataset_dir):
 	filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
 	################################## SPECTROGRAM ####################################
 
-	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), '~ Data streams are different ~'
+	################################## SPECTROGRAM ####################################
+	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cc/*.csv')))
+	X_cc = np.array([dataset_features.get_compare_features(f) for f in cc_files])
+	y_cc = np.zeros((X_cc.shape[0], 2))
+	y_cc[:,0] = 1
+
+	cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cd/*.csv')))
+	X_cd = np.array([dataset_features.get_compare_features(f) for f in cd_files])
+	y_cd = np.zeros((X_cd.shape[0], 2))
+	y_cd[:,1] = 1
+
+	X_compare = np.concatenate((X_cc, X_cd), axis=0).astype(np.float32)
+	y_compare = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+	filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
+	################################## SPECTROGRAM ####################################
+
+	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and X_compare.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), '~ Data streams are different ~'
 	print('~ Data streams verified ~')
 	y = y_intervention
 	y_reg = y_reg_intervention
@@ -119,4 +135,4 @@ def prepare_data(dataset_dir):
 	y, y_reg = y[p], y_reg[p]
 	filenames_intervention, filenames_pause, filenames_spec = filenames_intervention[p], filenames_pause[p], filenames_spec[p]
 
-	return X_intervention, X_pause, X_spec, X_reg_intervention, X_reg_pause, y, y_reg, filenames_intervention, filenames_pause, filenames_spec
+	return X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, y, y_reg, filenames_intervention, filenames_pause, filenames_spec

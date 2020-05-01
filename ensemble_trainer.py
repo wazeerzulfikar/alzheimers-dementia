@@ -8,18 +8,20 @@ import trainer
 def bagging_ensemble_training(dataset_dir, model_dir, n_splits):
 
 	data = dataset.prepare_data(dataset_dir)
-	X_intervention, X_pause, X_spec, X_reg_intervention, X_reg_pause = data[0:5]
-	y, y_reg, filenames_intervention, filenames_pause, filenames_spec = data[5:]
+	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause = data[0:6]
+	y, y_reg, filenames_intervention, filenames_pause, filenames_spec = data[6:]
 
 	## Train Intervention, models saved in `model_dir/intervention_{fold}.h5`
 	intervention_results = trainer.train_n_folds('intervention', X_intervention, y, n_splits, model_dir)
 	pause_results = trainer.train_n_folds('pause', X_pause, y, n_splits, model_dir)
-	spectogram_results = trainer.train_n_folds('spectogram', X_spec, y, n_splits, model_dir)
+	# spectogram_results = trainer.train_n_folds('spectogram', X_spec, y, n_splits, model_dir)
+	compare_results = trainer.train_n_folds('compare', X_compare, y, n_splits, model_dir)
 
 	return {
 		'intervention_results' : intervention_results, 
 		'pause_results': pause_results, 
-		'spectogram_results' : spectogram_results
+		# 'spectogram_results' : spectogram_results,
+		'compare_results' : compare_results
 	}
 
 def boosted_train_a_fold(
@@ -53,8 +55,8 @@ def boosted_train_a_fold(
 def boosted_ensemble_training(dataset_dir, model_dir, n_splits=5):
 	
 	data = dataset.prepare_data(dataset_dir)
-	X_intervention, X_pause, X_spec, X_reg_intervention, X_reg_pause = data[0:5]
-	y, y_reg, filenames_intervention, filenames_pause, filenames_spec = data[5:]
+	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause = data[0:6]
+	y, y_reg, filenames_intervention, filenames_pause, filenames_spec = data[6:]
 
 	## Train Intervention, models saved in `model_dir/intervention/fold_{fold}.h5`
 	intervention_results = trainer.train_n_folds('intervention', X_intervention, y, n_splits, model_dir)

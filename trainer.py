@@ -9,6 +9,8 @@ from tensorflow.keras.models import Model
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 import dataset_features, dataset_utils
 
@@ -58,8 +60,27 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 		batch_size = 8
 		epsilon = 1e-07
 
+	elif model_type == 'compare':
+		features_size = 21
+		model = create_compare_model(features_size)
+		epochs = 400
+		batch_size = 8
+		epsilon = 1e-07
+
+		sc = StandardScaler()
+		sc.fit(x_train)
+
+		x_train = sc.transform(x_train)
+		x_val = sc.transform(x_val)
+
+		pca = PCA(n_components=features_size)
+		pca.fit(x_train)
+
+		x_train = pca.transform(x_train)
+		x_val = pca.transform(x_val)
+
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_categorical_accuracy', verbose=0, save_best_only=True,
+			os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
 			save_weights_only=False, mode='auto', save_freq='epoch')
 
 	model.compile(loss=tf.keras.losses.categorical_crossentropy,
@@ -150,4 +171,18 @@ def create_pause_model(n_features):
 	model.add(layers.BatchNormalization())
 	model.add(layers.Dropout(0.5))
 	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+	return model
+
+def create_compare_model(features_size):
+
+	model = tf.keras.Sequential()
+	model.add(layers.Input(shape=(features_size,)))
+	model.add(layers.Dense(8, activation='relu'))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(8, activation='relu'))
+	model.add(layers.BatchNormalization())
+	model.add(layers.Dropout(0.2))
+	model.add(layers.Dense(2, activation='softmax'))
+
 	return model
