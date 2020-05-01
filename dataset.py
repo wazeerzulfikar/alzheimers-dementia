@@ -2,6 +2,7 @@ import glob, os, math, time
 import numpy as np
 np.random.seed(0)
 p = np.random.permutation(108) # n_samples = 108
+print('Permutation: ', p)
 
 import tensorflow as tf
 from tensorflow.keras import layers
