@@ -27,7 +27,6 @@ def prepare_data(dataset_dir):
 	for filename in cd_files:
 		all_speakers_cd.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
 
-	### Classification X and y values
 	y_cc = np.zeros((len(all_speakers_cc), 2))
 	y_cc[:,0] = 1
 
@@ -37,15 +36,12 @@ def prepare_data(dataset_dir):
 	X_intervention = np.concatenate((all_speakers_cc, all_speakers_cd), axis=0).astype(np.float32)
 	y_intervention = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 	filenames_intervention = np.concatenate((cc_files, cd_files), axis=0)
-	################################
 
-	### Regression X and y values
 	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
 	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
 	y_reg_intervention = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 	X_reg_intervention = np.copy(X_intervention)
-	#################################
 	################################## INTERVENTION ####################################
 
 	################################## PAUSE ####################################
@@ -69,18 +65,13 @@ def prepare_data(dataset_dir):
 
 	X_pause = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
-	### Regression y values
 	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
 	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
 	y_reg_pause = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
-	#######################
 
-	### Regression X values
 	X_reg_pause = np.copy(X_pause)
-	#######################
 
-	### Classification y values
 	y_cc = np.zeros((len(all_counts_cc), 2))
 	y_cc[:,0] = 1
 
@@ -108,7 +99,7 @@ def prepare_data(dataset_dir):
 	filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
 	################################## SPECTROGRAM ####################################
 
-	################################## SPECTROGRAM ####################################
+	################################## COMPARE ####################################
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cc/*.csv')))
 	X_cc = np.array([dataset_features.get_compare_features(f) for f in cc_files])
 	y_cc = np.zeros((X_cc.shape[0], 2))
@@ -121,18 +112,26 @@ def prepare_data(dataset_dir):
 
 	X_compare = np.concatenate((X_cc, X_cd), axis=0).astype(np.float32)
 	y_compare = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
-	filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
-	################################## SPECTROGRAM ####################################
 
-	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and X_compare.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), '~ Data streams are different ~'
+	X_reg_compare = np.copy(X_compare)
+
+	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+
+	y_reg_compare = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+
+	filenames_compare = np.concatenate((cc_files, cd_files), axis=0)
+	################################## COMPARE ####################################
+
+	assert np.array_equal(y_intervention, y_pause) and np.array_equal(y_pause, y_spec) and np.array_equal(y_reg_intervention, y_reg_pause) and np.array_equal(y_reg_intervention, y_reg_compare) and X_intervention.shape[0]==X_pause.shape[0] and X_intervention.shape[0]==X_spec.shape[0] and X_compare.shape[0]==X_spec.shape[0] and np.array_equal(filenames_intervention, filenames_pause), '~ Data streams are different ~'
 	print('~ Data streams verified ~')
 	y = y_intervention
 	y_reg = y_reg_intervention
 	X_length = X_intervention.shape[0] # 108
 
-	X_intervention, X_pause, X_spec = X_intervention[p], X_pause[p], X_spec[p]
-	X_reg_intervention, X_reg_pause = X_reg_intervention[p], X_reg_pause[p]
+	X_intervention, X_pause, X_spec, X_compare = X_intervention[p], X_pause[p], X_spec[p], X_compare[p]
+	X_reg_intervention, X_reg_pause, X_reg_compare = X_reg_intervention[p], X_reg_pause[p], X_reg_compare[p]
 	y, y_reg = y[p], y_reg[p]
-	filenames_intervention, filenames_pause, filenames_spec = filenames_intervention[p], filenames_pause[p], filenames_spec[p]
+	filenames_intervention, filenames_pause, filenames_spec, filenames_compare = filenames_intervention[p], filenames_pause[p], filenames_spec[p], filenames_compare[p]
 
-	return X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, y, y_reg, filenames_intervention, filenames_pause, filenames_spec
+	return X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare, y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare
