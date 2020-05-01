@@ -8,6 +8,8 @@ import os
 import math
 import numpy as np
 np.random.seed(0)
+n_ = 108
+p = np.random.permutation(n_)
 
 import tensorflow as tf
 
@@ -50,7 +52,6 @@ y_reg = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 X_reg = np.copy(X)
 #################################
 
-p = np.random.permutation(len(X))
 X, X_reg = X[p], X_reg[p]
 y, y_reg = y[p], y_reg[p]
 filenames = filenames[p]
@@ -83,7 +84,7 @@ def training(loocv=False):
     train_accuracies, train_losses = [], []
     fold = 0
 
-    print(create_model(longest_speaker_length).summary())
+    # print(create_model(longest_speaker_length).summary())
 
 
     for train_index, val_index in KFold(n_split).split(X):
@@ -187,19 +188,24 @@ def evaluate_models():
     print('Val mean', np.mean(val_accuracies)) # 0.768
     print('Val std', np.std(val_accuracies)) # 0.09
 
-def regression():
-    '''
-    Performs regression on classification models
-    '''
+def regression(loocv=False):
+
+    if loocv==True:
+        n_split = X_reg.shape[0]
+        model_dir = 'loocv-models-intervention'
+    else:
+        n_split = 5
+        model_dir = '5-fold-models-intervention'
 
     fold = 0
-    n_split = 5
     epochs = 2000
     batch_size = 8
 
     train_scores, val_scores = [], []
+    val_rounded_scores = []
     all_train_predictions, all_val_predictions = [], []
     all_train_true, all_val_true = [], []
+    train_accuracies, val_accuracies = [], [] # classification
 
     for train_index, val_index in KFold(n_split).split(X_reg):
 
@@ -208,7 +214,9 @@ def regression():
         x_train, x_val = X_reg[train_index], X_reg[val_index]
         y_train, y_val = y_reg[train_index], y_reg[val_index]
 
-        model = tf.keras.models.load_model('best_model_intervention_{}.h5'.format(fold))
+        model = tf.keras.models.load_model(os.path.join(model_dir, 'intervention_{}.h5'.format(fold)))
+        train_accuracies.append(model.evaluate(X[train_index], y[train_index], verbose=0)[1])
+        val_accuracies.append(model.evaluate(X[val_index], y[val_index], verbose=0)[1])
         model.pop()
         for layer in model.layers:
             layer.trainable = False
@@ -227,7 +235,7 @@ def regression():
             optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
         checkpointer = tf.keras.callbacks.ModelCheckpoint(
-                        'best_model_intervention_reg_{}.h5'.format(fold), monitor='val_loss', verbose=0, save_best_only=True,
+                        os.path.join(model_dir, 'intervention_reg_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
                         save_weights_only=False, mode='auto', save_freq='epoch')
         timeString = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         log_name = "{}".format(timeString)
@@ -240,7 +248,7 @@ def regression():
                             callbacks=[checkpointer, tensorboard],
                             validation_data=(x_val, y_val))
 
-        model_reg = tf.keras.models.load_model('best_model_intervention_reg_{}.h5'.format(fold))
+        model_reg = tf.keras.models.load_model(os.path.join(model_dir, 'intervention_reg_{}.h5'.format(fold)))
         # models.append(model)
         train_score = math.sqrt(model_reg.evaluate(x_train, y_train, verbose=0))
         train_scores.append(train_score)
@@ -253,6 +261,14 @@ def regression():
         all_val_predictions.append(val_predictions)
         all_train_true.append(y_train)
         all_val_true.append(y_val)
+        val_rounded_scores.append(math.sqrt(np.mean(list(map(lambda i: (round(val_predictions[i,0]) - y_val[i])**2, list(range(val_predictions.shape[0])))))))
+
+
+        print()
+        print('Val score:', val_score)
+        print('Val score mean till fold {} is {}'.format(fold, np.mean(val_scores)))
+        print('Val rounded score mean till fold {} is {}'.format(fold, np.mean(val_rounded_scores)))
+        print()
 
     print()
     print('################### TRAIN VALUES ###################')
@@ -278,14 +294,30 @@ def regression():
     print('Train std', np.std(train_scores))
 
     print()
-    print('Val accuracies ', val_scores)
+    print('Val Scores ', val_scores)
     print('Val mean', np.mean(val_scores))
     print('Val std', np.std(val_scores))
 
-# regression()
+    print()
+    print('Val rounded Scores ', val_rounded_scores)
+    print('Val rounded mean', np.mean(val_rounded_scores))
+    print('Val rounded std', np.std(val_rounded_scores))
+
+    print()
+    print('################# CLASSIFICATION #################')
+    print('Train accuracies ', train_accuracies)
+    print('Train mean', np.mean(train_accuracies))
+    print('Train std', np.std(train_accuracies))
+
+    print()
+    print('Val accuracies ', val_accuracies)
+    print('Val mean', np.mean(val_accuracies))
+    print('Val std', np.std(val_accuracies))
+
+regression(loocv=False)
 # evaluate_models()
 # training_on_entire_dataset(X, y, longest_speaker_length)
-training(loocv=True)
+# training(loocv=False)
 
 ####################  Simple Thresholding ####################
 # for threshold in range(10):
