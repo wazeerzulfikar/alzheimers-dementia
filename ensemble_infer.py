@@ -121,7 +121,7 @@ def infer(dataset_dir, model_dir):
 	train_accuracies = []
 	val_accuracies = []
 
-	if dataset_split == 'no_split':
+	if dataset_split == 'no_split': # compare features need to be projected
 		pause_probs = pause_models[0].predict(pause_features)
 		# spec_probs = spec_models[0].predict(spectogram_features)
 		inv_probs = intervention_models[0].predict(intervention_features)
@@ -194,7 +194,7 @@ def infer(dataset_dir, model_dir):
 
 			elif voting_type=='learnt_voting':
 				model_predictions = np.concatenate((pause_probs, inv_probs, compare_probs), axis=-1)
-				voter = LogisticRegression(C=0.1).fit(model_predictions, np.argmax(y_train, axis=-1))
+				voter = LogisticRegression().fit(model_predictions, np.argmax(y_train, axis=-1))
 				# print('Voter coef ', voter.coef_)
 				voted_predictions = voter.predict(model_predictions)
 
