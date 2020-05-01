@@ -201,8 +201,8 @@ def infer(dataset_dir, model_dir):
 			compare_probs = compare_models[fold].predict(compare_val)
 
 			if voting_type=='hard_voting':
-				model_predictions = [[np.argmax(pause_probs[i]), np.argmax(inv_probs[i]),  np.argmax(compare_probs[i])] for i in range(len(y_train))]
-				# model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_train))]
+				model_predictions = [[np.argmax(pause_probs[i]), np.argmax(inv_probs[i]),  np.argmax(compare_probs[i])] for i in range(len(y_val))] # this should be y_val
+				# model_predictions = [[np.argmax(pause_probs[i]), np.argmax(spec_probs[i]), np.argmax(inv_probs[i])] for i in range(len(y_val))]
 				voted_predictions = [max(set(i), key = i.count) for i in model_predictions]
 
 			elif voting_type=='soft_voting':
