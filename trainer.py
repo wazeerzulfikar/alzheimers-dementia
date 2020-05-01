@@ -1,7 +1,6 @@
 import glob, os, math, time
 import numpy as np
 np.random.seed(0)
-p = np.random.permutation(108) # n_samples = 108
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -11,8 +10,6 @@ from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-
-import dataset_features, dataset_utils
 
 def train_n_folds(model_type, x, y, n_folds=5, model_dir='default'):
 
