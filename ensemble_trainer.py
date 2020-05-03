@@ -5,24 +5,28 @@ import tensorflow as tf
 import dataset
 import trainer
 
-def bagging_ensemble_training(dataset_dir, model_dir, n_splits):
+def bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits):
 
 	data = dataset.prepare_data(dataset_dir)
 	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare = data[0:7]
 	y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare = data[7:]
 
-	## Train Intervention, models saved in `model_dir/intervention_{fold}.h5`
-	intervention_results = trainer.train_n_folds('intervention', X_intervention, y, n_splits, model_dir)
-	pause_results = trainer.train_n_folds('pause', X_pause, y, n_splits, model_dir)
-	# spectogram_results = trainer.train_n_folds('spectogram', X_spec, y, n_splits, model_dir)
-	compare_results = trainer.train_n_folds('compare', X_compare, y, n_splits, model_dir)
-
-	return {
-		'intervention_results' : intervention_results, 
-		'pause_results': pause_results, 
-		# 'spectogram_results' : spectogram_results,
-		'compare_results' : compare_results
+	feature_types = {
+		'intervention': X_intervention,
+		'pause': X_pause,
+		'spectogram': X_spec,
+		'compare': X_compare
 	}
+
+	results = {}
+
+	## Train Intervention, models saved in `model_dir/intervention_{fold}.h5`
+	for m in model_types:
+		m_results = trainer.train_n_folds(m, feature_types[m], y, n_splits, model_dir)
+
+	results[m] = m_results
+
+	return results
 
 def boosted_train_a_fold(
 	booster_model_type, 
@@ -52,30 +56,36 @@ def boosted_train_a_fold(
 
 	return results
 
-def boosted_ensemble_training(dataset_dir, model_dir, n_splits=5):
+def boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits=5):
+	'''
+	Training order is same as model_types
+	'''
 	
 	data = dataset.prepare_data(dataset_dir)
 	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare = data[0:7]
 	y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare = data[7:]
 
-	## Train Intervention, models saved in `model_dir/intervention/fold_{fold}.h5`
-	intervention_results = trainer.train_n_folds('intervention', X_intervention, y, n_splits, model_dir)
-
-	# INTERVENTION -> PAUSE
-	pause_results = []
-	for fold in range(1, n_splits+1):
-
-		pause_results_fold = boosted_train_a_fold('intervention', X_intervention, y, 'pause', X_pause, fold, model_dir)
-		pause_results.append(pause_results_fold)
-
-	# PAUSE -> SPECTROGRAM
-	spectogram_results = []
-	for fold in range(1, n_splits+1):
-		spectogram_results_fold = boosted_train_a_fold('pause', X_pause, y, 'spectogram', X_spec, fold, model_dir)
-		spectogram_results.append(spectogram_results_fold)
-	
-	return {
-		'intervention_results' : intervention_results, 
-		'pause_results': pause_results, 
-		'spectogram_results' : spectogram_results
+	feature_types = {
+		'intervention': X_intervention,
+		'pause': X_pause,
+		'spectogram': X_spec,
+		'compare': X_compare
 	}
+
+	results = {}
+
+	## Train Intervention, models saved in `model_dir/intervention/fold_{fold}.h5`
+	m_results = trainer.train_n_folds(model_types[0], feature_types[model_types[0]], y, n_splits, model_dir)
+	results[model_types[0]] = m_results
+	if len(model_types) > 1:
+		for m_i in range(1, len(model_types)):
+			for fold in range(1, n_splits+1):
+				booster_features = feature_types[model_types[m_i-1]]
+				boosted_features = feature_types[model_types[m_i]]
+				m_results_fold = boosted_train_a_fold(model_types[m_i-1], booster_features, y, 
+					model_types[m_i], boosted_features, fold, model_dir)
+				m_results.append(m_results_fold)
+
+			results[m] = m_results
+	
+	return results

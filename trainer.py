@@ -77,7 +77,7 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 		x_val = pca.transform(x_val)
 
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
+			os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_categorical_accuracy', verbose=0, save_best_only=True,
 			save_weights_only=False, mode='auto', save_freq='epoch')
 
 	model.compile(loss=tf.keras.losses.categorical_crossentropy,
