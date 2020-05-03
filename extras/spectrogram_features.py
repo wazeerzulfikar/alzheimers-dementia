@@ -37,12 +37,12 @@ spectogram_size = (480, 640)
 dataset_dir = ''
 dataset_dir = '../spectograms/'
 cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'cc-images/*.png')))
-X_cc = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cc_files])
+X_cc = np.array([dataset_features.get_old_spectogram_features(f) for f in cc_files])
 y_cc = np.zeros((X_cc.shape[0], 2))
 y_cc[:,0] = 1
 
 cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'cd-images/*.png')))
-X_cd = np.array([dataset_features.get_spectogram_features(f, spectogram_size[::-1]) for f in cd_files])
+X_cd = np.array([dataset_features.get_old_spectogram_features(f) for f in cd_files])
 y_cd = np.zeros((X_cd.shape[0], 2))
 y_cd[:,1] = 1
 
@@ -303,7 +303,7 @@ def create_model(_type_ = 'convolutional'):
 		model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
 		model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
 		model2_output = layers.Dropout(0.2)(model2_hidden11)
-		model2_output = layers.Dense(num_classes, activation='softmax')(model2_output)
+		model2_output = layers.Dense(2, activation='softmax')(model2_output)
 
 		model = models.Model(model2_input, model2_output)
 
@@ -389,15 +389,14 @@ def training(X, y, loocv=False):
 					  optimizer=tf.keras.optimizers.Adam(lr=0.001, epsilon=0.1),
 					  metrics=['categorical_accuracy'])
 
-		datagen = DataGenerator(x_train, y_train, batch_size)
+		# datagen = DataGenerator(x_train, y_train, batch_size)
 
 		checkpointer = tf.keras.callbacks.ModelCheckpoint(
 	            os.path.join(model_dir, 'spec_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=False,
 	            save_weights_only=False, mode='auto', save_freq='epoch'
 	        )
-		model.fit(datagen.flow(),
+		model.fit(x_train, y_train, batch_size=batch_size,
 				  epochs=epochs,
-				  steps_per_epoch=datagen.get_n_batches(),
 				  verbose=1,
 				  callbacks=[checkpointer],
 				  validation_data=(x_val, y_val))
@@ -452,6 +451,6 @@ def training_on_entire_dataset(X, y):
 	print('Train Loss: {}\t Train Accuracy: {}'.format(train_loss, train_acc))
 
 # training_on_entire_dataset(X, y)
-training(X, y, loocv=True)
+training(X, y, loocv=False)
 
 
