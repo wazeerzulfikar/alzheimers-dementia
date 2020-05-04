@@ -89,11 +89,12 @@ def get_spectogram_features(spectogram_filename):
     mel = np.expand_dims(mel, axis=-1)
     return mel
 
-def get_old_spectogram_features(spectogram_filename):
+def get_old_spectogram_features(spectogram_filename, image_size):
     '''
     Spectogram features include MFCC which has been pregenerated for the audio file
     '''
     mel = cv2.imread(spectogram_filename)
+    mel = cv2.resize(mel, image_size[::-1])
     # mel = feature_normalize(mel)
     return mel
 
