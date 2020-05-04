@@ -36,7 +36,8 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 
 	print('Training fold {} of {}'.format(fold, model_type))
 
-	assert model_type == 'spectogram', 'Regression has not been done with spectograms'
+	if model_type == 'spectogram':
+		raise Exception('Regression has not been done with spectograms')
 
 	model = tf.keras.models.load_model(os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)))
 	model.pop()
