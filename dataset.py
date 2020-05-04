@@ -86,12 +86,12 @@ def prepare_data(dataset_dir):
 	################################## SPECTROGRAM ####################################
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cc/*.png')))
 	spectogram_size = (480, 640)
-	X_cc = np.array([dataset_features.get_old_spectogram_features(f) for f in cc_files])
+	X_cc = np.array([dataset_features.get_old_spectogram_features(f, spectogram_size) for f in cc_files])
 	y_cc = np.zeros((X_cc.shape[0], 2))
 	y_cc[:,0] = 1
 
 	cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cd/*.png')))
-	X_cd = np.array([dataset_features.get_old_spectogram_features(f) for f in cd_files])
+	X_cd = np.array([dataset_features.get_old_spectogram_features(f, spectogram_size) for f in cd_files])
 	y_cd = np.zeros((X_cd.shape[0], 2))
 	y_cd[:,1] = 1
 
