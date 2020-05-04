@@ -13,7 +13,7 @@ np.random.seed(0)
 # Local imports
 import dataset
 
-def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dataset_split='full_dataset'):
+def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dataset_split='full_dataset', n_split = 5):
 	print('Loading data...')
 
 	data = dataset.prepare_data(dataset_dir)
@@ -38,10 +38,8 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 
 		saved_model_types[m] = saved_models
 
-	fold = 0
-	n_split = 5
-
 	print('Using {} on {}'.format(voting_type, dataset_split))
+	print('Models evaluated ', model_types)
 
 	train_accuracies = []
 	val_accuracies = []
@@ -62,6 +60,7 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 		print('Full dataset Accuracy {:.3f}'.format(accuracy))
 
 	elif dataset_split == 'k_fold':
+		fold = 0
 		
 		for train_index, val_index in KFold(n_split).split(y):
 			compare_train, compare_val = compare_features[train_index], compare_features[val_index]
