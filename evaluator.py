@@ -81,8 +81,12 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 
 			if len(model_types) == 1:
 				m = model_types[0]
-				train_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][train_index], y_train)
-				val_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][val_index], y_val)
+				if m == 'compare':
+					train_accuracy = get_individual_accuracy(saved_model_types[m][fold], compare_train, y_train)
+					val_accuracy = get_individual_accuracy(saved_model_types[m][fold], compare_val, y_val)
+				else:
+					train_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][train_index], y_train)
+					val_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][val_index], y_val)
 			else:
 
 				models = []
@@ -139,7 +143,7 @@ def get_ensemble_accuracy(models, features, y, voting_type, num_classes=2, learn
 	elif voting_type=='learnt_voting':
 		model_predictions = np.reshape(probs, (len(y), -1))
 		if learnt_voter is None:
-			learnt_voter = LogisticRegression().fit(model_predictions, np.argmax(y, axis=-1))
+			learnt_voter = LogisticRegression(C=0.1).fit(model_predictions, np.argmax(y, axis=-1))
 		# print('Voter coef ', voter.coef_)
 		voted_predictions = learnt_voter.predict(model_predictions)
 
