@@ -1,4 +1,4 @@
-import os
+import os, math
 import glob
 
 import tensorflow as tf
@@ -10,6 +10,9 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 np.random.seed(0)
 
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="6"
+
 # Local imports
 import dataset
 
@@ -18,12 +21,14 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 
 	data = dataset.prepare_data(dataset_dir)
 	intervention_features, pause_features, compare_features = data[4:7]
-	y, filenames = data[8], data[9]
+	y_class, y, filenames = data[7], data[8], data[9]
 
 	feature_types = {
 		'intervention': intervention_features,
 		'pause': pause_features,
-		'compare': compare_features
+		'compare': compare_features,
+		'intervention-scratch': intervention_features,
+		'pause-scratch': pause_features
 	}
 
 	compare_feature_size = 21
@@ -37,6 +42,8 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 
 		saved_model_types[m] = saved_models
 
+	print()
+	print('Loading models from {}'.format(model_dir))
 	print('Using {} on {}'.format(voting_type, dataset_split))
 	print('Models evaluated ', model_types)
 
@@ -66,11 +73,11 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 			if len(model_types) == 1:
 				m = model_types[0]
 				if m == 'compare':
-					train_accuracy = get_individual_accuracy(saved_model_types[m][fold], compare_train, y_train)
-					val_accuracy = get_individual_accuracy(saved_model_types[m][fold], compare_val, y_val)
+					train_score = get_individual_score(saved_model_types[m][fold], compare_train, y_train)
+					val_score = get_individual_score(saved_model_types[m][fold], compare_val, y_val)
 				else:
-					train_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][train_index], y_train)
-					val_accuracy = get_individual_accuracy(saved_model_types[m][fold], feature_types[m][val_index], y_val)
+					train_score = get_individual_score(saved_model_types[m][fold], feature_types[m][train_index], y_train)
+					val_score = get_individual_score(saved_model_types[m][fold], feature_types[m][val_index], y_val)
 			else:
 				models = []
 				features = []
@@ -90,7 +97,7 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 					else:	
 						features.append(feature_types[m][val_index])
 
-				val_score, _ = get_ensemble_accuracy(models, features, y_val, voting_type, learnt_voter=learnt_voter)
+				val_score, _ = get_ensemble_score(models, features, y_val, voting_type, learnt_voter=learnt_voter)
 
 			train_scores.append(train_score)
 			val_scores.append(val_score)
@@ -106,6 +113,9 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 			print('Val score std: {:.3f}'.format(np.std(val_scores)))
 
 def get_individual_score(model, feature, y):
+	preds = list(map(lambda i:i[0], model.predict(feature)))
+	print(len([i for i in preds if i>=26]))
+	# print(model.predict(feature))
 	return math.sqrt(model.evaluate(feature, y, verbose=0))
 
 def get_ensemble_score(models, features, y, voting_type, num_classes=2, learnt_voter=None):
