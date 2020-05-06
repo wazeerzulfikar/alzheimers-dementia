@@ -10,8 +10,8 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 np.random.seed(0)
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="6"
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"]="6"
 
 # Local imports
 import dataset
@@ -113,26 +113,33 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='soft_voting', dat
 			print('Val score std: {:.3f}'.format(np.std(val_scores)))
 
 def get_individual_score(model, feature, y):
-	preds = list(map(lambda i:i[0], model.predict(feature)))
+	# preds = list(map(lambda i:i[0], model.predict(feature)))
+	y = np.array(y)
+	preds = model.predict(feature)
+	if len(preds) == 2:
+		preds = preds[1]
 	print(len([i for i in preds if i>=26]))
 	# print(model.predict(feature))
-	return math.sqrt(model.evaluate(feature, y, verbose=0))
+	score = mean_squared_error(np.expand_dims(y, axis=-1), preds, squared=False)
+	return score
 
 def get_ensemble_score(models, features, y, voting_type, num_classes=2, learnt_voter=None):
 	preds = []
 	for model, feature in zip(models, features):
-		pred = model.predict(feature)
-		preds.append(pred)
+		probs = model.predict(feature)
+		if len(probs) == 2:
+			probs = probs[1]
+		preds.append(probs)
 	preds = np.stack(preds, axis=1) # 86,3,1
 
 	if voting_type=='soft_voting':
 		voted_predictions = np.mean(preds, axis=1)
-	elif voting_type=='learnt_voting':
-		model_predictions = np.reshape(preds, (len(y), -1)) # 86,3
-		if learnt_voter is None:
-			learnt_voter = LogisticRegression().fit(model_predictions, np.expand_dims(y, axis=-1))
-		# print('Voter coef ', voter.coef_)
-		voted_predictions = learnt_voter.predict(model_predictions)
+	# elif voting_type=='learnt_voting':
+	# 	model_predictions = np.reshape(preds, (len(y), -1)) # 86,3
+	# 	if learnt_voter is None:
+	# 		learnt_voter = LogisticRegression().fit(model_predictions, np.expand_dims(y, axis=-1))
+	# 	# print('Voter coef ', voter.coef_)
+	# 	voted_predictions = learnt_voter.predict(model_predictions)
 
 	score = mean_squared_error(np.expand_dims(y, axis=-1), voted_predictions, squared=False)
 	return score, learnt_voter
