@@ -2,7 +2,7 @@ import glob, os, math, time
 import numpy as np
 np.random.seed(0)
 p = np.random.permutation(108) # n_samples = 108
-print('Permutation: ', p)
+# print('Permutation: ', p)
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -136,3 +136,44 @@ def prepare_data(dataset_dir):
 	filenames_intervention, filenames_pause, filenames_spec, filenames_compare = filenames_intervention[p], filenames_pause[p], filenames_spec[p], filenames_compare[p]
 
 	return X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare, y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare
+
+
+def prepare_test_data(dataset_dir):
+	################################## INTERVENTION ####################################
+
+	longest_speaker_length = 32
+
+	filenames = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
+	X_intervention = []
+	for filename in filenames:
+		X_intervention.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
+
+	################################## INTERVENTION ####################################
+
+	################################## PAUSE ####################################
+
+	transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
+	audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/*.wav')))
+
+	X_pause = []
+	for t_f, a_f in zip(transcription_files, audio_files):
+		pause_features = dataset_features.get_pause_features(t_f, a_f)
+		X_pause.append(pause_features)
+
+
+	################################## PAUSE ####################################
+
+	################################## SPECTROGRAM ####################################
+	spec_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/*.png')))
+	spectogram_size = (480, 640)
+	X_spec = np.array([dataset_features.get_old_spectogram_features(f) for f in spec_files])
+	
+	################################## SPECTROGRAM ####################################
+
+	################################## COMPARE ####################################
+	compare_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/*.csv')))
+	X_compare = np.array([dataset_features.get_compare_features(f) for f in compare_files])
+	
+	################################## COMPARE ####################################
+
+	return X_intervention, X_pause, X_spec, X_compare, filenames
