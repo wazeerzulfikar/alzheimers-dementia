@@ -104,11 +104,16 @@ def test(test_filename, train_dataset_dir, test_dataset_dir, model_dir, model_ty
 			models.append(saved_model_types[m][select_fold - 1])
 			if m == 'compare':
 				features.append(compare_features_t)
+			elif m == 'combined':
+				features.append((np.array(feature_types['intervention']), np.array(feature_types['pause'])))
 			else:	
 				features.append(feature_types[m])
 
-		ensemble_predictions = get_ensemble_predictions(models, features, voting_type)
-		ensemble_predictions = np.squeeze(ensemble_predictions)
+		if len(model_types) == 1:
+			ensemble_predictions = get_individual_predictions(models[0], features[0])
+		else:
+			ensemble_predictions = get_ensemble_predictions(models, features, voting_type)
+			ensemble_predictions = np.squeeze(ensemble_predictions)
 		# print(np.unique(ensemble_predictions, return_counts=1))
 		print(list(ensemble_predictions))
 		print(len([i for i in list(ensemble_predictions) if i>=26]))
@@ -121,11 +126,14 @@ def test(test_filename, train_dataset_dir, test_dataset_dir, model_dir, model_ty
 		# Write column names
 		test_f.write(content[0]+'\n')
 		for e,line in enumerate(content[1:-1]):
-			new_line = line+' '+str(ensemble_predictions[e])
+			new_line = line+' '+str(ensemble_predictions[e][0])
 			test_f.write(new_line+'\n')
 
 def get_individual_predictions(model, feature):
-	return model.predict(feature, verbose=0)
+	preds = model.predict(feature)
+	if len(preds) == 2:
+		preds = preds[1]
+	return preds
 
 def get_ensemble_predictions(models, features, voting_type='soft_voting'):
 	preds = []

@@ -84,7 +84,7 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 			save_weights_only=False, mode='auto', save_freq='epoch')
 
 	model.compile(loss=tf.keras.losses.categorical_crossentropy,
-				  optimizer=tf.keras.optimizers.Adam(lr=0.01, epsilon=epsilon),
+				  optimizer=tf.keras.optimizers.Adam(lr=0.005, epsilon=epsilon),
 				  metrics=['categorical_accuracy'])
 	model.fit(x_train, y_train,
 			  batch_size=batch_size,

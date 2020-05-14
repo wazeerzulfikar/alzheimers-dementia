@@ -1,6 +1,10 @@
 import os
 import numpy as np
 import tensorflow as tf
+from sklearn.model_selection import KFold
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
 
 import dataset
 import trainer
@@ -25,7 +29,6 @@ def bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits):
 		m_results = trainer.train_n_folds(m, feature_types[m], y, n_splits, model_dir)
 
 	results[m] = m_results
-
 	return results
 
 def boosted_train_a_fold(
@@ -36,9 +39,26 @@ def boosted_train_a_fold(
 	X2,
 	fold, 
 	model_dir,
+	n_split=5
 	):
 
 	booster_model = tf.keras.models.load_model(os.path.join(model_dir, booster_model_type, 'fold_{}.h5'.format(fold)))
+
+	# special stuff for compare features
+	if booster_model_type == 'compare':
+		compare_feature_size = 21
+		fold_ = 0
+		for train_index, val_index in KFold(n_split).split(X1):
+			compare_train = X1[train_index]
+			if fold_ == fold:
+				break
+			fold_+=1
+		sc = StandardScaler()
+		sc.fit(compare_train)
+		X1 = sc.transform(X1)
+		pca = PCA(n_components=compare_feature_size)
+		pca.fit(compare_train)
+		X1 = pca.transform(X1)
 
 	booster_losses = []
 	for idx, x in enumerate(X1):
@@ -74,11 +94,13 @@ def boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits=5):
 
 	results = {}
 
-	## Train Intervention, models saved in `model_dir/intervention/fold_{fold}.h5`
+	# Train model type, models saved in `model_dir/{model_type}/fold_{fold}.h5`
 	m_results = trainer.train_n_folds(model_types[0], feature_types[model_types[0]], y, n_splits, model_dir)
 	results[model_types[0]] = m_results
+
 	if len(model_types) > 1:
 		for m_i in range(1, len(model_types)):
+			m_results = []
 			for fold in range(1, n_splits+1):
 				booster_features = feature_types[model_types[m_i-1]]
 				boosted_features = feature_types[model_types[m_i]]
@@ -86,6 +108,6 @@ def boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits=5):
 					model_types[m_i], boosted_features, fold, model_dir)
 				m_results.append(m_results_fold)
 
-			results[m] = m_results
+			results[model_types[m_i]] = m_results
 	
 	return results

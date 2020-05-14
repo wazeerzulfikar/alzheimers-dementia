@@ -63,6 +63,8 @@ def test(test_filename, train_dataset_dir, test_dataset_dir, model_dir, model_ty
 				models.append(saved_model_types[m][fold])
 				if m == 'compare':
 					features.append(compare_features_t)
+				elif m == 'combined':
+					features.append((np.array(feature_types['intervention']), np.array(feature_types['pause'])))
 				else:	
 					features.append(feature_types[m])
 
@@ -94,15 +96,20 @@ def test(test_filename, train_dataset_dir, test_dataset_dir, model_dir, model_ty
 		pca = PCA(n_components=compare_feature_size)
 		pca.fit(compare_train)
 		compare_features_t = pca.transform(compare_features_t)
-		
+
 		for m in model_types:
 			models.append(saved_model_types[m][select_fold - 1])
 			if m == 'compare':
 				features.append(compare_features_t)
+			elif m == 'combined':
+				features.append((np.array(feature_types['intervention']), np.array(feature_types['pause'])))
 			else:	
-				features.append(feature_types[m])
+				features.append(np.array(feature_types[m]))
 
-		ensemble_predictions = get_ensemble_predictions(models, features, voting_type)
+		if len(model_types) == 1:
+			ensemble_predictions = get_individual_predictions(models[0], features[0])
+		else:
+			ensemble_predictions = get_ensemble_predictions(models, features, voting_type)
 
 		print(np.unique(ensemble_predictions, return_counts=1))
 		print(list(ensemble_predictions))
@@ -119,13 +126,18 @@ def test(test_filename, train_dataset_dir, test_dataset_dir, model_dir, model_ty
 			test_f.write(new_line+'\n')
 
 def get_individual_predictions(model, feature):
-	return model.predict(feature, verbose=0)
+	pred =  model.predict(feature)
+	if len(pred) == 2:
+		pred = pred[0]
+	return np.argmax(pred, axis=-1)
 
 def get_ensemble_predictions(models, features, voting_type, num_classes=2, learnt_voter=None):
 	probs = []
 	for model, feature in zip(models, features):
 		feature = np.array(feature)
 		pred = model.predict(feature)
+		if len(pred) == 2:
+			pred = pred[0]
 		probs.append(pred)
 	probs = np.stack(probs, axis=1)
 
@@ -135,6 +147,7 @@ def get_ensemble_predictions(models, features, voting_type, num_classes=2, learn
 		voted_predictions = [max(set(i), key = list(i).count) for i in model_predictions]
 	elif voting_type=='soft_voting':
 		model_predictions = np.sum(probs, axis=1)
+		# model_predictions = probs[:,0,:] * 0.7 + probs[:,1,:] * 0.3
 		voted_predictions = np.argmax(model_predictions, axis=-1)
 	elif voting_type=='learnt_voting':
 		model_predictions = np.reshape(probs, (len(y), -1))
