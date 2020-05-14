@@ -5,6 +5,7 @@ Functions for reading and extracting data
 import contextlib
 import re
 import wave
+from mutagen.mp3 import MP3
 
 import numpy as np
 
@@ -114,6 +115,11 @@ def get_audio_length(filename):
         frames = f.getnframes()
         rate = f.getframerate()
         duration = frames / float(rate)
+    return duration
+
+def get_mp3_audio_length(filename):
+    audio = MP3(filename)
+    duration = audio.info.length
     return duration
 
 
