@@ -12,8 +12,7 @@ import trainer
 def bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits):
 
 	data = dataset.prepare_data(dataset_dir)
-	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare = data[0:7]
-	y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare = data[7:]
+	X_intervention, X_pause, X_spec, X_compare, y, y_reg, subjects = data
 
 	feature_types = {
 		'intervention': X_intervention,
@@ -26,7 +25,7 @@ def bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits):
 
 	## Train Intervention, models saved in `model_dir/intervention_{fold}.h5`
 	for m in model_types:
-		m_results = trainer.train_n_folds(m, feature_types[m], y, n_splits, model_dir)
+		m_results = trainer.train_n_folds(m, subjects, feature_types[m], y, n_splits, model_dir, split_reference='samples')
 
 	results[m] = m_results
 	return results
@@ -82,8 +81,7 @@ def boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits=5):
 	'''
 	
 	data = dataset.prepare_data(dataset_dir)
-	X_intervention, X_pause, X_spec, X_compare, X_reg_intervention, X_reg_pause, X_reg_compare = data[0:7]
-	y, y_reg, filenames_intervention, filenames_pause, filenames_spec, filenames_compare = data[7:]
+	X_intervention, X_pause, X_spec, X_compare, y, y_reg, subjects = data
 
 	feature_types = {
 		'intervention': X_intervention,

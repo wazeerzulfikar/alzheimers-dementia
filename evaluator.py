@@ -18,14 +18,13 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 	print('Loading data...')
 
 	data = dataset.prepare_data(dataset_dir)
-	intervention_features, pause_features, spectogram_features, compare_features = data[0:4]
-	y, filenames = data[7], data[9]
+	X_intervention, X_pause, X_spec, X_compare, y, y_reg, subjects = data
 
 	feature_types = {
-		'intervention': intervention_features,
-		'pause': pause_features,
-		'spectogram': spectogram_features,
-		'compare': compare_features
+		'intervention': X_intervention,
+		'pause': X_pause,
+		'spectogram': X_spec,
+		'compare': X_compare
 	}
 
 	compare_feature_size = 21
@@ -48,7 +47,7 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 		if len(model_types) == 1:
 			if m == 'compare':
 				m = model_types[0]
-				accuracy = get_individual_accuracy(saved_model_types[m][0], compare_features, y)
+				accuracy = get_individual_accuracy(saved_model_types[m][0], X_compare, y)
 			else:
 				m = model_types[0]
 				accuracy = get_individual_accuracy(saved_model_types[m][0], feature_types[m], y)
@@ -58,7 +57,7 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 			for m in model_types:
 				models.append(saved_model_types[m][2])
 				if m == 'compare':
-					features.append(compare_features)
+					features.append(X_compare)
 				else:	
 					features.append(feature_types[m])
 			print('Full dataset')
@@ -68,7 +67,7 @@ def evaluate(dataset_dir, model_dir, model_types, voting_type='hard_voting', dat
 		fold = 0
 		
 		for train_index, val_index in KFold(n_split).split(y):
-			compare_train, compare_val = compare_features[train_index], compare_features[val_index]
+			compare_train, compare_val = X_compare[train_index], X_compare[val_index]
 			y_train, y_val = y[train_index], y[val_index]
 
 			sc = StandardScaler()
