@@ -11,18 +11,25 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def train_n_folds(model_type, x, y, n_folds=5, model_dir='default'):
+def train_n_folds(model_type, subjects, x, y, n_folds=5, model_dir='default', split_reference='samples'):
 
 	train_accuracies = []
 	val_accuracies = []
 	fold = 0
 
-	for train_index, val_index in KFold(n_folds).split(x):
+	if split_reference == 'samples':
+		splitter = x
+	elif split_reference == 'subjects':
+		splitter = subjects
+
+	for train_index, val_index in KFold(n_folds).split(splitter):
 		fold+=1
 
-		x_train, x_val = x[train_index], x[val_index]
-		y_train, y_val = y[train_index], y[val_index]
-		# filenames_train, filenames_val = filenames[train_index], filenames[val_index]
+		if split_reference == 'samples':
+			x_train, x_val = x[train_index], x[val_index]
+			y_train, y_val = y[train_index], y[val_index]
+		# elif split_reference == 'subjects':
+
 
 		results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir)
 		train_accuracy, val_accuracy= results

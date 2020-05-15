@@ -22,13 +22,12 @@ def train_n_folds(model_type, x, y, n_folds=5, model_dir='default'):
 
 		x_train, x_val = x[train_index], x[val_index]
 		y_train, y_val = y[train_index], y[val_index]
-		# filenames_train, filenames_val = filenames[train_index], filenames[val_index]
 
 		results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir)
 		train_score, val_score = results
 
-		train_scores.append(train_accuracy)
-		val_scores.append(val_accuracy)
+		train_scores.append(train_score)
+		val_scores.append(val_score)
 	
 	return train_scores, val_scores
 
