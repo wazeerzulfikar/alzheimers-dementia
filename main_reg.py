@@ -2,54 +2,46 @@ from pathlib import Path
 
 import ensemble_trainer_reg
 import evaluator_reg
+import test_writer_reg
 
 def main():
+	# dataset_dir = '../DementiaBank'
 	dataset_dir = '../ADReSS-IS2020-data/train'
+	model_dir = 'models/bagging_reg'
 
-	# model_dir = 'results/bagging_i_p_c'
-	# model_dir = 'results/bagging_tuned_val_loss'
-	# model_dir = 'results/bagging_i_p_c_val_acc'
-	# model_dir = 'results/bagging_i_p_s_val_acc'
-
-	# model_dir = 'results/boosting_i_p_c_val_loss'
-	# model_dir = 'results/boosting_i_p_s_val_loss'
-	# model_dir = 'results/boosting_i_p_c_val_acc'
-	# model_dir = 'results/boosting_i_p_s_val_acc'
-	model_dir = 'results/bagging_val_loss'
-	model_dir = 'results/multi-head'
-	# model_dir = 'tuner/'
-
-	# model_dir = 'temp'
-
-	model_dir = Path(model_dir)
-	submodel_dirs = ['intervention', 'pause', 'spectogram', 'compare']
-	# for m in submodel_dirs:
-	# 	model_dir.joinpath(m).mkdir(parents=True, exist_ok=True)
-
-	model_dir = str(model_dir)
-
-	model_types = ['pause']
-	model_types = ['pause-scratch']
-	# model_types = ['intervention', 'intervention-scratch']
-	# model_types = ['intervention-scratch']
-	model_types = ['intervention']
-	# model_types = ['compare']
-	# model_types = ['intervention', 'pause', 'spectogram']
+	training_type = 'bagging'
+	# training_type = 'boosting'
 
 	n_splits = 5
-
-	# results = ensemble_trainer_reg.bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits)
-
-	# Training order is same as model_types
 
 	# dataset_split = 'full_dataset'
 	dataset_split = 'k_fold'
 
-	# voting_type = 'hard_voting'
-	voting_type = 'soft_voting'
+	voting_type = 'hard_voting'
+	# voting_type = 'soft_voting'
 	# voting_type = 'learnt_voting'
 
-	evaluator_reg.evaluate(dataset_dir, model_dir, model_types, voting_type=voting_type, dataset_split=dataset_split)
+	model_types = ['intervention', 'pause', 'compare']
+
+	# Create save directories
+	model_dir = Path(model_dir)
+	for m in model_types:
+		model_dir.joinpath(m).mkdir(parents=True, exist_ok=True)
+	model_dir = str(model_dir)
+
+
+	if training_type == 'bagging':
+		ensemble_trainer_reg.bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits)
+
+	elif training_type == 'boosting':
+		# Training order is same as model_types
+		ensemble_trainer_reg.boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits)
+
+	evaluator_reg.evaluate(dataset_dir, model_dir, model_types, voting_type=voting_type, dataset_split=dataset_split, n_split=n_splits)
+
+	# test_dataset_dir = '../ADReSS-IS2020-data/test'
+	# test_filename = '../submissions_scratch/35.txt'
+	# test_writer_reg.test(test_filename, dataset_dir, test_dataset_dir, model_dir, model_types, voting_type=voting_type, select_fold=None)
 
 if __name__ == '__main__':
 	main()
