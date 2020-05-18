@@ -1,13 +1,26 @@
 '''
-Functions for reading and extracting data
+Util functions for reading and extracting data and other stuff
 '''
-
+from pathlib import Path
 import contextlib
 import re
 import wave
 from mutagen.mp3 import MP3
 
 import numpy as np
+
+################# Utils #################
+
+class EasyDict(dict):
+    def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs)
+    def __getattr__(self, name): return self[name]
+    def __setattr__(self, name, value): self[name] = value
+    def __delattr__(self, name): del self[name] 
+
+def create_directories(config):
+    model_dir = Path(config.model_dir)
+    for m in config.model_types:
+        model_dir.joinpath(m).mkdir(parents=True, exist_ok=True)
 
 ################# PAUSE FEATURES #################
 
