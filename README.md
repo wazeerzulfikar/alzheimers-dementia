@@ -2,7 +2,10 @@
 
 Alzheimer's Dementia Recognition through Spontaneous Speech
 
-# Compare features extraction
+## Run
+Set config parameters and then `python main.py`
+
+### Compare features extraction
 
 * First download the [opensmile](https://www.audeering.com/opensmile/) toolkit.
 * Unpack downloaded file using tar -zxvf openSMILE-2.x.x.tar.gz
@@ -10,6 +13,7 @@ Alzheimer's Dementia Recognition through Spontaneous Speech
 * Use this command bash autogen.sh or sh autogen.sh
 * Use these commands make -j4 ; make
 * finally use make install
+=======
 
 ## SVM experiment
 ### 10 features

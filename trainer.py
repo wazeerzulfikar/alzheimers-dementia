@@ -11,27 +11,36 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def train_n_folds(model_type, subjects, x, y, n_folds=5, model_dir='default', split_reference='samples'):
+import models
+
+def train_n_folds(model_type, data, config):
 
 	train_accuracies = []
 	val_accuracies = []
 	fold = 0
 
-	if split_reference == 'samples':
+	x = data[model_type]
+
+	if config.task == 'classification':
+		y = data['y_clf']
+	elif config.task == 'regression':
+		y = data['y_reg']
+
+	subjects = data['subjects']
+
+	if config.split_reference == 'samples':
 		splitter = x
-	elif split_reference == 'subjects':
+	elif config.split_reference == 'subjects':
 		splitter = subjects
 
-	for train_index, val_index in KFold(n_folds).split(splitter):
+	for train_index, val_index in KFold(config.n_folds).split(splitter):
 		fold+=1
 
-		if split_reference == 'samples':
+		if config.split_reference == 'samples':
 			x_train, x_val = x[train_index], x[val_index]
 			y_train, y_val = y[train_index], y[val_index]
-		# elif split_reference == 'subjects':
 
-
-		results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir)
+		results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config)
 		train_accuracy, val_accuracy= results
 
 		train_accuracies.append(train_accuracy)
@@ -39,36 +48,20 @@ def train_n_folds(model_type, subjects, x, y, n_folds=5, model_dir='default', sp
 	
 	return train_accuracies, val_accuracies
 
-def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
+def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
 
 	print('Training fold {} of {}'.format(fold, model_type))
 
-	if model_type == 'spectogram':
-		spectogram_size = (480, 640, 3)
-		model = create_spectogram_model(spectogram_size)
-		epochs = 30
-		batch_size = 8
-		epsilon = 0.1
-
-	elif model_type == 'pause':
-		n_features = 11
-		model = create_pause_model(n_features)
-		epochs = 600
-		batch_size = 8
+	if model_type == 'pause':
+		model = models.create_pause_model(config.task, config.n_pause_features)
 		epsilon = 1e-07
 
 	elif model_type == 'intervention':
-		longest_speaker_length = 32
-		model = create_intervention_model(longest_speaker_length)
-		epochs = 400
-		batch_size = 8
+		model = models.create_intervention_model(config.task, config.longest_speaker_length)
 		epsilon = 1e-07
 
 	elif model_type == 'compare':
-		features_size = 21
-		model = create_compare_model(features_size)
-		epochs = 400
-		batch_size = 8
+		model = models.create_compare_model(config.task, config.compare_features_size)
 		epsilon = 1e-07
 
 		sc = StandardScaler()
@@ -77,19 +70,30 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 		x_train = sc.transform(x_train)
 		x_val = sc.transform(x_val)
 
-		pca = PCA(n_components=features_size)
+		pca = PCA(n_components=config.compare_features_size)
 		pca.fit(x_train)
 
 		x_train = pca.transform(x_train)
 		x_val = pca.transform(x_val)
 
-	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
-			save_weights_only=False, mode='auto', save_freq='epoch')
+	if config.task == 'classification':
+		epochs = 10
+		batch_size = 8
 
-	model.compile(loss=tf.keras.losses.categorical_crossentropy,
+		model.compile(loss= tf.keras.losses.categorical_crossentropy,
 				  optimizer=tf.keras.optimizers.Adam(lr=0.01, epsilon=epsilon),
 				  metrics=['categorical_accuracy'])
+	elif config.task == 'regression':
+		epochs = 20
+		batch_size = 8
+
+		model.compile(loss=tf.keras.losses.mean_squared_error, 
+			optimizer=tf.keras.optimizers.Adam(lr=0.01, epsilon=epsilon))
+
+	checkpointer = tf.keras.callbacks.ModelCheckpoint(
+			os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
+			save_weights_only=False, mode='auto', save_freq='epoch')
+
 	model.fit(x_train, y_train,
 			  batch_size=batch_size,
 			  epochs=epochs,
@@ -97,99 +101,16 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, model_dir):
 			  callbacks=[checkpointer],
 			  validation_data=(x_val, y_val))
 
-	model = tf.keras.models.load_model(os.path.join(model_dir, model_type, 'fold_{}.h5'.format(fold)))
+	model = tf.keras.models.load_model(os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)))
 
 	train_score = model.evaluate(x_train, y_train, verbose=0)
-	train_accuracy = train_score[1]
-	train_loss = train_score[0]
+	if config.task == 'classification':
+		train_score = train_score[1]
 
 	val_score = model.evaluate(x_val, y_val, verbose=0)
-	print('Fold Val accuracy:', val_score[1])
-	val_accuracy = val_score[1]
-	val_loss = val_score[0]
+	if config.task == 'classification':
+		val_score = val_score[1]
 
-	return train_accuracy, val_accuracy
+	print('Fold Val accuracy:', val_score)
 
-def create_intervention_model(longest_speaker_length):
-	model = tf.keras.Sequential()
-	model.add(layers.LSTM(16, input_shape=(longest_speaker_length, 3)))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.2))
-	model.add(layers.Dense(16, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dense(2, activation='softmax'))
-	return model
-
-def create_spectogram_model(spectogram_size):
-	model2_input = layers.Input(shape=spectogram_size,  name='spectrogram_input')
-	model2_BN = layers.BatchNormalization()(model2_input)
-	
-	model2_hidden1 = layers.Conv2D(16, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu')(model2_BN)
-	# model2_hidden2 = layers.Conv2D(16, kernel_size=(3, 3), strides=(2, 2),
-	# 					 activation='relu')(model2_hidden1)
-	model2_BN1 = layers.BatchNormalization()(model2_hidden1)
-	model2_hidden2 = layers.MaxPool2D()(model2_BN1)
-	
-	model2_hidden3 = layers.Conv2D(32, kernel_size=(3, 3), strides=(1, 1),
-						 activation='relu')(model2_hidden2)
-	# model2_hidden4 = layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2),
-	# 					 activation='relu')(model2_hidden3)
-	model2_BN2 = layers.BatchNormalization()(model2_hidden3)
-	model2_hidden4 = layers.MaxPool2D()(model2_BN2)
-
-	model2_hidden5 = layers.Conv2D(64, kernel_size=(5, 5), strides=(1, 1),
-						 activation='relu')(model2_hidden4)
-	# model2_hidden6 = layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2),
-	# 					 activation='relu')(model2_hidden5)
-	model2_BN3 = layers.BatchNormalization()(model2_hidden5)
-	model2_hidden6 = layers.MaxPool2D()(model2_BN3)
-
-	model2_hidden7 = layers.Conv2D(128, kernel_size=(5, 5), strides=(1, 1),
-						 activation='relu')(model2_hidden6)
-	# model2_hidden8 = layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2),
-	# 					 activation='relu')(model2_hidden7)
-	model2_BN4 = layers.BatchNormalization()(model2_hidden7)
-	model2_hidden8 = layers.MaxPool2D()(model2_BN4)
-
-	model2_hidden9 = layers.Flatten()(model2_hidden8)
-	# model2_hidden10 = layers.Dropout(0.2)(model2_hidden9)
-	model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
-	model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
-	model2_output = layers.Dropout(0.2)(model2_hidden11)
-	model2_output = layers.Dense(2, activation='softmax')(model2_output)
-
-	model = Model(model2_input, model2_output)
-
-	return model
-
-def create_pause_model(n_features):
-	model = tf.keras.Sequential()
-	model.add(layers.Input(shape=(n_features,)))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dense(16, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.2))
-	model.add(layers.Dense(16, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.2))
-	model.add(layers.Dense(24, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.1))
-	model.add(layers.Dense(24, activation='relu'))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.1))
-	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-	return model
-
-def create_compare_model(features_size):
-
-	model = tf.keras.Sequential()
-	model.add(layers.Input(shape=(features_size,)))
-	model.add(layers.Dense(24, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-	model.add(layers.BatchNormalization())
-	model.add(layers.Dropout(0.2))
-
-	model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-
-	return model
+	return train_score, val_score

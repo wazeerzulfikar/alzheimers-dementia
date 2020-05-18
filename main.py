@@ -1,47 +1,59 @@
-from pathlib import Path
-
+import dataset
 import ensemble_trainer
 import evaluator
 import test_writer
+import utils
 
-def main():
-	# dataset_dir = '../DementiaBank'
-	dataset_dir = '../ADReSS-IS2020-data/train'
-	model_dir = 'models/bagging'
+# Config to choose the hyperparameters for everything
 
-	training_type = 'bagging'
-	# training_type = 'boosting'
+config = utils.EasyDict({
+	'task': 'classification',
+	# 'task': 'regression',
 
-	n_splits = 5
+	# 'dataset_dir': '../DementiaBank'
+	'dataset_dir': '../ADReSS-IS2020-data/train',
 
-	# dataset_split = 'full_dataset'
-	dataset_split = 'k_fold'
+	'model_dir': 'models/bagging',
+	'model_types': ['intervention', 'pause', 'compare'],
 
-	voting_type = 'hard_voting'
-	# voting_type = 'soft_voting'
-	# voting_type = 'learnt_voting'
+	'training_type': 'bagging',
+	# 'training_type' :'boosting',
 
-	model_types = ['intervention', 'pause', 'compare']
+	'n_folds': 5,
+
+	# 'dataset_split' :'full_dataset',
+	'dataset_split' :'k_fold',
+
+	'voting_type': 'hard_voting',
+	# 'voting_type': 'soft_voting',
+	# 'voting_type': 'learnt_voting',
+
+
+	'longest_speaker_length': 32,
+	'n_pause_features': 11,
+	'compare_features_size': 21,
+	'split_reference': 'samples'
+})
+
+def main(config):
 
 	# Create save directories
-	model_dir = Path(model_dir)
-	for m in model_types:
-		model_dir.joinpath(m).mkdir(parents=True, exist_ok=True)
-	model_dir = str(model_dir)
+	utils.create_directories(config)
 
+	# Prepare and load the data
+	data = dataset.prepare_data(config)
 
-	if training_type == 'bagging':
-		ensemble_trainer.bagging_ensemble_training(dataset_dir, model_dir, model_types, n_splits)
+	# Train the ensemble models
+	if config.training_type == 'bagging':
+		ensemble_trainer.bagging_ensemble_training(data, config)
+	elif config.training_type == 'boosting':		
+		ensemble_trainer.boosted_ensemble_training(data, config)
 
-	elif training_type == 'boosting':
-		# Training order is same as model_types
-		ensemble_trainer.boosted_ensemble_training(dataset_dir, model_dir, model_types, n_splits)
+	# Evaluate the model
+	evaluator.evaluate(data, config)
 
-	evaluator.evaluate(dataset_dir, model_dir, model_types, voting_type=voting_type, dataset_split=dataset_split, n_split=n_splits)
-
-	# test_dataset_dir = '../ADReSS-IS2020-data/test'
-	# test_filename = '../submissions_scratch/35.txt'
+	# Write out test results (todo)
 	# test_writer.test(test_filename, dataset_dir, test_dataset_dir, model_dir, model_types, voting_type=voting_type, select_fold=None)
 
 if __name__ == '__main__':
-	main()
+	main(config)

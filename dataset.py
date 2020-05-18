@@ -1,12 +1,14 @@
-import glob, os, math, time
+import glob
+import os
+import math
+import time
 import re
+import csv
+
 import numpy as np
 np.random.seed(0)
 p = np.random.permutation(108) # n_samples = 108
-# p = np.random.permutation(497)
 p_subjects = np.random.RandomState(seed=0).permutation(242)
-# print('Permutation: ', p)
-
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
@@ -14,9 +16,87 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
 
-import dataset_features, dataset_utils
+import utils
 
-def prepare_data(dataset_dir):
+	
+def get_pause_features(transcription_filename, audio_filename, audio_length_normalization=10):
+    '''
+    Pause features include word rate, pause rate of various kinds of pauses and utterances, and intervention rate
+    '''
+    audio_len =  utils.get_audio_length(audio_filename)/audio_length_normalization
+
+    with open(transcription_filename, 'r') as f:
+        content = f.read()
+        word_rate = utils.words_count(content) / (50 * audio_len)
+        pause_rates = utils.get_pauses_cnt(content) / audio_len
+        inv_rate = utils.get_n_interventions(content) / audio_len
+
+    pause_features = np.concatenate(([inv_rate], pause_rates, [word_rate]), axis=-1)
+
+    return pause_features
+
+
+def get_intervention_features(transcription_filename, max_length=40):
+    '''
+    Intervention features include one hot encoded sequence of speaker (par or inv) in the conversation
+    '''
+    speaker_dict = {
+        'INV': [0 ,0 , 1],
+        'PAR': [0, 1, 0],
+        'padding': [1, 0, 0]
+    }
+
+    with open(transcription_filename, 'r') as f:
+        content = f.read()
+        content = content.split('\n')
+        speakers = []
+
+        for c in content:
+            if 'INV' in c:
+              speakers.append('INV')
+            if 'PAR' in c:
+              speakers.append('PAR')
+
+        PAR_first_index = speakers.index('PAR')
+        PAR_last_index = len(speakers) - speakers[::-1].index('PAR') - 1
+        intervention_features = speakers[PAR_first_index:PAR_last_index]
+
+    intervention_features = list(map(lambda x: speaker_dict[x], intervention_features))
+
+    if len(intervention_features) > max_length:
+        intervention_features = intervention_features[:max_length]
+    else:
+        pad_length = max_length - len(intervention_features)
+        intervention_features =intervention_features+[speaker_dict['padding']]*pad_length
+
+    return intervention_features
+
+
+def get_spectogram_features(spectogram_filename):
+    '''
+    Spectogram features include MFCC which has been pregenerated for the audio file
+    '''
+    mel = np.load(spectogram_filename)
+    # mel = feature_normalize(mel)
+    mel = np.expand_dims(mel, axis=-1)
+    return mel
+
+
+def get_compare_features(compare_filename):
+    compare_features = []
+    with open(compare_filename, 'r') as file:
+        content = csv.reader(file)
+        for row in content:
+            compare_features = row
+    compare_features_floats = [float(item) for item in compare_features[1:-1]]
+    return compare_features_floats
+
+
+def prepare_data(config):
+	'''
+	Prepare all data
+	'''
+	dataset_dir = config.dataset_dir
 	################################## SUBJECTS ################################
 
 	subject_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*/*.cha')))
@@ -28,21 +108,19 @@ def prepare_data(dataset_dir):
 
 	################################## INTERVENTION ####################################
 
-	longest_speaker_length = 32
-	# longest_speaker_length = 40
 
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cc/*.cha')))
 	all_speakers_cc = []
 	for filename in cc_files:
-		all_speakers_cc.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
-		# print(dataset_features.get_intervention_features(filename, longest_speaker_length))
+		all_speakers_cc.append(get_intervention_features(filename, config.longest_speaker_length))
+		# print(get_intervention_features(filename, longest_speaker_length))
 	
 	
 	cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
 	all_speakers_cd = []
 	for filename in cd_files:
-		all_speakers_cd.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
-		# print(dataset_features.get_intervention_features(filename, longest_speaker_length))
+		all_speakers_cd.append(get_intervention_features(filename, config.longest_speaker_length))
+		# print(get_intervention_features(filename, longest_speaker_length))
 	
 	# b = [len(i) for i in all_speakers_cc]
 	# print(len(b), np.min(b), np.mean(b), np.max(b))
@@ -59,8 +137,8 @@ def prepare_data(dataset_dir):
 	y_intervention = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
 	filenames_intervention = np.concatenate((cc_files, cd_files), axis=0)
 
-	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
-	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+	y_reg_cc = utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
 	y_reg_intervention = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 	X_reg_intervention = np.copy(X_intervention)
@@ -76,7 +154,7 @@ def prepare_data(dataset_dir):
 
 	all_counts_cc = []
 	for t_f, a_f in zip(cc_transcription_files, cc_audio_files):
-		pause_features = dataset_features.get_pause_features(t_f, a_f)
+		pause_features = get_pause_features(t_f, a_f)
 		all_counts_cc.append(pause_features)
 
 	cd_transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/cd/*.cha')))
@@ -87,13 +165,13 @@ def prepare_data(dataset_dir):
 
 	all_counts_cd = [] 
 	for t_f, a_f in zip(cd_transcription_files, cd_audio_files):
-		pause_features = dataset_features.get_pause_features(t_f, a_f)
+		pause_features = get_pause_features(t_f, a_f)
 		all_counts_cd.append(pause_features)
 
 	X_pause = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
 
-	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
-	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+	y_reg_cc = utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
 	y_reg_pause = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 
@@ -109,32 +187,14 @@ def prepare_data(dataset_dir):
 	filenames_pause = np.concatenate((cc_transcription_files, cd_transcription_files), axis=0)
 	################################## PAUSE ####################################
 
-	################################## SPECTROGRAM ####################################
-	# cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cc/*.png')))
-	# spectogram_size = (480, 640)
-	# X_cc = np.array([dataset_features.get_old_spectogram_features(f, spectogram_size) for f in cc_files])
-	# y_cc = np.zeros((X_cc.shape[0], 2))
-	# y_cc[:,0] = 1
-
-	# cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/cd/*.png')))
-	# X_cd = np.array([dataset_features.get_old_spectogram_features(f, spectogram_size) for f in cd_files])
-	# y_cd = np.zeros((X_cd.shape[0], 2))
-	# y_cd[:,1] = 1
-
-	# X_spec = np.concatenate((X_cc, X_cd), axis=0).astype(np.float32)
-	# y_spec = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
-	# filenames_spec = np.concatenate((cc_files, cd_files), axis=0)
-	X_spec = 0
-	################################## SPECTROGRAM ####################################
-
 	################################## COMPARE ####################################
 	cc_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cc/*.csv')))
-	X_cc = np.array([dataset_features.get_compare_features(f) for f in cc_files])
+	X_cc = np.array([get_compare_features(f) for f in cc_files])
 	y_cc = np.zeros((X_cc.shape[0], 2))
 	y_cc[:,0] = 1
 
 	cd_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/cd/*.csv')))
-	X_cd = np.array([dataset_features.get_compare_features(f) for f in cd_files])
+	X_cd = np.array([get_compare_features(f) for f in cd_files])
 	y_cd = np.zeros((X_cd.shape[0], 2))
 	y_cd[:,1] = 1
 
@@ -143,8 +203,8 @@ def prepare_data(dataset_dir):
 
 	X_reg_compare = np.copy(X_compare)
 
-	y_reg_cc = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
-	y_reg_cd = dataset_utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+	y_reg_cc = utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
 
 	y_reg_compare = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
 
@@ -162,45 +222,13 @@ def prepare_data(dataset_dir):
 	# X_spec = X_spec[p] 
 	X_compare = X_compare[p]
 	y = y[p]
+	y_reg = y_reg[p]
 
-	return X_intervention, X_pause, X_spec, X_compare, y, y_reg, subjects
-
-def prepare_test_data(dataset_dir):
-	################################## INTERVENTION ####################################
-
-	longest_speaker_length = 32
-
-	filenames = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
-	X_intervention = []
-	for filename in filenames:
-		X_intervention.append(dataset_features.get_intervention_features(filename, longest_speaker_length))
-
-	################################## INTERVENTION ####################################
-
-	################################## PAUSE ####################################
-
-	transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
-	audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/*.wav')))
-
-	X_pause = []
-	for t_f, a_f in zip(transcription_files, audio_files):
-		pause_features = dataset_features.get_pause_features(t_f, a_f)
-		X_pause.append(pause_features)
-
-
-	################################## PAUSE ####################################
-
-	################################## SPECTROGRAM ####################################
-	spec_files = sorted(glob.glob(os.path.join(dataset_dir, 'spectograms/*.png')))
-	spectogram_size = (480, 640)
-	X_spec = np.array([dataset_features.get_old_spectogram_features(f) for f in spec_files])
-	
-	################################## SPECTROGRAM ####################################
-
-	################################## COMPARE ####################################
-	compare_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/*.csv')))
-	X_compare = np.array([dataset_features.get_compare_features(f) for f in compare_files])
-	
-	################################## COMPARE ####################################
-
-	return X_intervention, X_pause, X_spec, X_compare, filenames
+	return {
+		'intervention': X_intervention,
+		'pause': X_pause,
+		'compare': X_compare,
+		'y_clf': y,
+		'y_reg': y_reg,
+		'subjects': subjects
+	}
