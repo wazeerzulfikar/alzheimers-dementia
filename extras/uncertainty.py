@@ -184,7 +184,8 @@ print('Deep ensemble of {} models took {} minutes'.format(n_models, int((time.ti
 
 min_prob = float(Decimal(str(np.min(ensemble_pred_probs))).quantize(Decimal('.001'), rounding=ROUND_DOWN))
 max_prob = float(Decimal(str(np.max(ensemble_pred_probs))).quantize(Decimal('.001'), rounding=ROUND_DOWN))
-bins = np.arange(min_prob, max_prob, 1e-3)
+# bins = np.arange(min_prob, max_prob, 1e-3)
+bins = np.linspace(min_prob, max_prob, num=10)
 
 binned_rmses = []
 for b in bins:
