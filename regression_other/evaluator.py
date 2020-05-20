@@ -71,7 +71,7 @@ def train_a_fold(fold, config, x_train, y_train, x_val, y_val):
                                   period=1)
     model.fit(x_train,
               y_train,
-              epochs=40,
+              epochs=200,
               verbose=0,
               callbacks=[checkpoints],
               validation_data=(x_val, y_val))

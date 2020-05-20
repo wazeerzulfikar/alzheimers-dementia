@@ -23,7 +23,7 @@ def load_dataset(config):
         
         if config.mod_split=='none':
             data = {'X':X, 'y':y}
-        elif config.mod_split=='none':
+        elif config.mod_split=='human':
             data = {'X1':X1, 'X2':X2, 'y':y}
 
     return data
