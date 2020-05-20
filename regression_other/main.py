@@ -40,7 +40,7 @@ config = EasyDict({
     'mod_split' :'none',
 #     'mod_split' :'human',
     
-    'learning_rate' : 0.01,
+    'learning_rate' : 0.1,
     
     'loss' : 'mse',
     

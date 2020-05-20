@@ -48,8 +48,8 @@ def evaluate_normal(config, data):
         train_mse.append(train_score)
         val_mse.append(val_score)    
         fold+=1
-    print("Train : MSE mean : ", np.mean(train_mse), " MSE std dev : ", np.std(train_mse))
-    print("Val MSE mean : ", np.mean(val_mse), " MSE std dev : ", np.std(val_mse))
+    print("Train : RMSE mean : ", np.sqrt(np.mean(train_mse)), " RMSE std dev : ", np.sqrt(np.std(train_mse)))
+    print("Val RMSE mean : ", np.sqrt(np.mean(val_mse)), " RMSE std dev : ", np.sqrt(np.std(val_mse)))
 
 def train_a_fold(fold, config, x_train, y_train, x_val, y_val):
     model = build_model(config)
