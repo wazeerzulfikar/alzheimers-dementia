@@ -50,16 +50,19 @@ def evaluate_normal(config, data):
 
 		fold_train_score, fold_val_score = [], []
 		mus_train, mus_val, sigmas_train, sigmas_val = [], [], [], []
+		train_preds, val_preds = [], []
 		for model_number in range(config.n_models):
 			model, history = train_a_fold(fold, model_number+1, config, x_train, y_train, x_val, y_val)
 			
 			if config.build_model=='point':
-				train_score = model.evaluate(x_train, y_train, verbose=0)
-				val_score = model.evaluate(x_val, y_val, verbose=0)
-				train_score = math.sqrt(train_score)
-				val_score = math.sqrt(val_score)
-				fold_train_score.append(train_score)
-				fold_val_score.append(val_score)
+				# train_score = model.evaluate(x_train, y_train, verbose=0)
+				train_preds.append(np.squeeze(model.predict(x_train)))
+				val_preds.append(np.squeeze(model.predict(x_val)))
+				# val_score = model.evaluate(x_val, y_val, verbose=0)
+				# train_score = math.sqrt(train_score)
+				# val_score = math.sqrt(val_score)
+				# fold_train_score.append(train_score)
+				# fold_val_score.append(val_score)
 
 			if config.build_model=='gaussian':
 				pred_train = model(x_train)
@@ -79,8 +82,9 @@ def evaluate_normal(config, data):
 			print('\nFold ', fold, ' Model number:', model_number+1, ' Train score:', train_score, ' Val score:', val_score, ' Best epoch:', best_epoch, '\n')
 
 		if config.build_model=='point':
-			final_train_score.append(np.mean(fold_train_score))
-			final_val_score.append(np.mean(fold_val_score))
+			final_train_score.append(mean_squared_error(y_train, np.mean(train_preds), squared=False))
+			final_val_score.append(mean_squared_error(y_val, np.mean(val_preds), squared=False))
+
 
 		if config.build_model=='gaussian':
 			mus_train, sigmas_train = np.concatenate(mus_train, axis=-1), np.concatenate(sigmas_train, axis=-1)
