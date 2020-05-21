@@ -37,6 +37,10 @@ config = EasyDict({
 
     # 'dataset_split' :'full_dataset',
     # 'dataset_split' :'k_fold',
+
+    'build_model': 'gaussian',
+    # 'build_model': 'point',
+
     
     'mod_split' :'none',
 #     'mod_split' :'human',
