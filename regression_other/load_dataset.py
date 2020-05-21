@@ -10,16 +10,16 @@ from sklearn.datasets import load_boston
 def load_dataset(config):
 
     if config.dataset=='boston':
-        data = _boston()        
+        data = _boston(config)        
 
     elif config.dataset=='cement':
-        data = _cement()
+        data = _cement(config)
 
     elif config.dataset=='energy':
-        data = _cement()
+        data = _cement(config)
 
     elif config.dataset=='cement':
-        data = _cement()
+        data = _cement(config)
 
     return data
 

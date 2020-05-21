@@ -1,8 +1,4 @@
-# import dataset
-# import ensemble_trainer
-# import evaluator
-# import test_writer
-# from  import utils
+import os
 from load_dataset import load_dataset
 from pathlib import Path
 from evaluator import evaluate_n
@@ -16,8 +12,11 @@ class EasyDict(dict):
 
 def create_directories(config):
     model_dir = Path(config.model_dir)
-    model_dir.joinpath(config.dataset).mkdir(parents=True, exist_ok=True)        
+    model_dir.joinpath(config.dataset).mkdir(parents=True, exist_ok=True)  
 
+    model_dir = Path(os.path.join(config.model_dir, config.dataset))
+    model_dir.joinpath(config.expt_name).mkdir(parents=True, exist_ok=True)        
+    # print(os.listdir(os.path.join(config.model_dir, config.dataset)))
 config = EasyDict({
     # 'task': 'classification',
     # 'task': 'regression',
@@ -26,7 +25,7 @@ config = EasyDict({
     # 'dataset_dir': '../ADReSS-IS2020-data/train',
 
     'dataset': 'boston',
-    'model_dir': 'models-2/',
+    'model_dir': 'models/',
     # 'model_types': ['intervention', 'pause', 'compare'],
 
     # 'training_type': 'bagging',
@@ -42,15 +41,22 @@ config = EasyDict({
     # 'build_model': 'point',
 
     
-    'mod_split' :'none',
-#     'mod_split' :'human',
+    # 'mod_split' :'none',
+    'mod_split' :'human',
+    # 'mod_split' :'computation_split',
     
-    # 'learning_rate' : 0.1,
+    'learning_rate' : 0.05,
+
+    'epochs' : 50,
     
-    # 'loss' : 'mse',
+    'loss' : 'mse',
     
-    # 'optimizer' : 'adams',
+    'optimizer' : 'adam',
+
+    'batch_size' : 100,
 })
+
+config.expt_name = config.build_model + "_" + config.optimizer + str(config.learning_rate) + "_bs" + str(config.batch_size) + "_epochs" + str(config.epochs)
 
 def main(config):
 
@@ -66,9 +72,9 @@ def main(config):
 
     # # Train the ensemble models
     # if config.training_type == 'bagging':
-    # 	ensemble_trainer.bagging_ensemble_training(data, config)
-    # elif config.training_type == 'boosting':		
-    # 	ensemble_trainer.boosted_ensemble_training(data, config)
+    #   ensemble_trainer.bagging_ensemble_training(data, config)
+    # elif config.training_type == 'boosting':      
+    #   ensemble_trainer.boosted_ensemble_training(data, config)
 
     # # Evaluate the model
     # evaluator.evaluate(data, config)
