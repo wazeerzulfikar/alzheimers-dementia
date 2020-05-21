@@ -20,31 +20,32 @@ def create_directories(config):
 
 config = EasyDict({
     # 'task': 'classification',
-    'task': 'regression',
+    # 'task': 'regression',
 
-    'dataset_dir': './datasets/',
+    # 'dataset_dir': './datasets/',
     # 'dataset_dir': '../ADReSS-IS2020-data/train',
 
     'dataset': 'boston',
     'model_dir': 'models/',
-    'model_types': ['intervention', 'pause', 'compare'],
+    # 'model_types': ['intervention', 'pause', 'compare'],
 
     # 'training_type': 'bagging',
     # 'training_type' :'boosting',
 
     'n_folds': 20,
+    'n_models': 5, # models in deep ensemble
 
     # 'dataset_split' :'full_dataset',
-    'dataset_split' :'k_fold',
+    # 'dataset_split' :'k_fold',
     
     'mod_split' :'none',
 #     'mod_split' :'human',
     
-    'learning_rate' : 0.1,
+    # 'learning_rate' : 0.1,
     
-    'loss' : 'mse',
+    # 'loss' : 'mse',
     
-    'optimizer' : 'adams',
+    # 'optimizer' : 'adams',
 })
 
 def main(config):
@@ -53,7 +54,7 @@ def main(config):
         config.n_folds = 5
 
     # Create save directories
-#     create_directories(config)
+    create_directories(config)
 
     data = load_dataset(config)
     

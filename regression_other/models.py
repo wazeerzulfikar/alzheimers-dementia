@@ -1,8 +1,8 @@
-import keras
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.optimizers import Adam, SGD
-from keras.losses import mean_absolute_error, mean_squared_error
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras.losses import mean_absolute_error, mean_squared_error
 
 def build_model(config):
     model = Sequential()
