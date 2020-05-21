@@ -4,6 +4,7 @@ from tensorflow.keras.models import load_model
 from sklearn.model_selection import KFold
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam, SGD
@@ -34,6 +35,7 @@ def evaluate_normal(config, data):
 	y = data['y']
 
 	final_train_score, final_val_score = [], []
+	final_train_rmse, final_val_rmse = [], []
 	best_epochs = []
 	
 	kf = KFold(n_splits=config.n_folds, shuffle=True, random_state=42)
@@ -47,6 +49,7 @@ def evaluate_normal(config, data):
 		x_train, x_val = standard_scale(x_train, x_val)
 
 		fold_train_score, fold_val_score = [], []
+		mus_train, mus_val, sigmas_train, sigmas_val = [], [], [], []
 		for model_number in range(config.n_models):
 			model, history = train_a_fold(fold, model_number+1, config, x_train, y_train, x_val, y_val)
 			
@@ -55,28 +58,68 @@ def evaluate_normal(config, data):
 				val_score = model.evaluate(x_val, y_val, verbose=0)
 				train_score = math.sqrt(train_score)
 				val_score = math.sqrt(val_score)
+				fold_train_score.append(train_score)
+				fold_val_score.append(val_score)
 
 			if config.build_model=='gaussian':
-				pred = model(x_val)
+				pred_train = model(x_train)
+				pred_val = model(x_val)
 				val_score = np.min(history.history['val_loss'])
 				train_score = history.history['loss'][np.argmin(history.history['val_loss'])]
-			
+				mu_val = pred_val.mean()
+				sigma_val = pred_val.stddev()
+				mus_val.append(mu_val.numpy())
+				sigmas_val.append(sigma_val.numpy())
+				mu_train = pred_train.mean()
+				sigma_train = pred_train.stddev()
+				mus_train.append(mu_train.numpy())
+				sigmas_train.append(sigma_train.numpy())
+
 			best_epoch = np.argmin(history.history['val_loss'])+1
-			print('\nFold ', fold, ' Model number:', model_number, ' Train score:', train_score, ' Val score:', val_score, ' Best epoch:', best_epoch, '\n')
+			print('\nFold ', fold, ' Model number:', model_number+1, ' Train score:', train_score, ' Val score:', val_score, ' Best epoch:', best_epoch, '\n')
 
-			fold_train_score.append(train_score)
-			fold_val_score.append(val_score)
+		if config.build_model=='point':
+			final_train_score.append(np.mean(fold_train_score))
+			final_val_score.append(np.mean(fold_val_score))
 
-		final_train_score.append(np.mean(fold_train_score))
-		final_val_score.append(np.mean(fold_val_score))
+		if config.build_model=='gaussian':
+			mus_train, sigmas_train = np.concatenate(mus_train, axis=-1), np.concatenate(sigmas_train, axis=-1)
+			ensemble_mu_train = np.mean(mus_train, axis=-1).reshape(-1,1)
+			ensemble_sigma_train = np.sqrt(np.mean(np.square(sigmas_train) + np.square(mus_train), axis=-1).reshape(-1,1) - np.square(ensemble_mu_train))
+			
+			mus_val, sigmas_val = np.concatenate(mus_val, axis=-1), np.concatenate(sigmas_val, axis=-1)
+			ensemble_mu_val = np.mean(mus_val, axis=-1).reshape(-1,1)
+			ensemble_sigma_val = np.sqrt(np.mean(np.square(sigmas_val) + np.square(mus_val), axis=-1).reshape(-1,1) - np.square(ensemble_mu_val))
+
+			tfd = tfp.distributions
+			ensemble_dist_train = tfd.Normal(loc=ensemble_mu_train, scale=ensemble_sigma_train)
+			ensemble_dist_val = tfd.Normal(loc=ensemble_mu_val, scale=ensemble_sigma_val)
+
+			ensemble_true_train_log_probs = ensemble_dist_train.log_prob(y_train).numpy()
+			final_train_score.append(np.mean(-ensemble_true_train_log_probs))
+			ensemble_true_val_log_probs = ensemble_dist_val.log_prob(y_val).numpy()
+			final_val_score.append(np.mean(-ensemble_true_val_log_probs))
+			final_train_rmse.append(mean_squared_error(y_train, ensemble_mu_train, squared=False))
+			final_val_rmse.append(mean_squared_error(y_val, ensemble_mu_val, squared=False))
 
 		# best_epochs.append(best_epoch)    
 		fold+=1
 	# print("\nBest epochs : ", best_epochs)
-	print("\nTrain Score : ", final_train_score)
-	print("Val Score : ", final_val_score)
-	print("Train Score mean : ", np.mean(final_train_score), "+/-", np.std(final_train_score))
-	print("Val Score mean : ", np.mean(final_val_score), "+/-", np.std(final_val_score))
+	if config.build_model=='point':
+		print("\nTrain RMSE : ", final_train_score)
+		print("Val RMSE : ", final_val_score)
+		print("Train RMSE mean : ", np.mean(final_train_score), "+/-", np.std(final_train_score))
+		print("Val RMSE mean : ", np.mean(final_val_score), "+/-", np.std(final_val_score))
+	if config.build_model=='gaussian':
+		print("\nTrain NLL : ", final_train_score)
+		print("Val NLL : ", final_val_score)
+		print("Train NLL mean : ", np.mean(final_train_score), "+/-", np.std(final_train_score))
+		print("Val NLL mean : ", np.mean(final_val_score), "+/-", np.std(final_val_score))
+		print("\nTrain RMSE : ", final_train_rmse)
+		print("Val RMSE : ", final_val_rmse)		
+		print("Train RMSE mean : ", np.mean(final_train_rmse), "+/-", np.std(final_train_rmse))
+		print("Val RMSE mean : ", np.mean(final_val_rmse), "+/-", np.std(final_val_rmse))		
+
 
 def train_a_fold(fold, model_number, config, x_train, y_train, x_val, y_val):
 	
@@ -84,10 +127,15 @@ def train_a_fold(fold, model_number, config, x_train, y_train, x_val, y_val):
 
 	if config.build_model=='point':
 		epochs = 200
-		lr = 0.005
+		lr = 0.05 # 0.005
+		batch_size = 32
 	elif config.build_model=='gaussian':
-		epochs = 300
-		lr = 0.05
+		# epochs = 300
+		# lr = 0.05
+		# batch_size = 32
+		epochs = 40
+		lr = 0.1
+		batch_size = 100
 
 	model.compile(loss=loss, optimizer=Adam(learning_rate=lr))
 	checkpoint_filepath = os.path.join(config.model_dir, config.dataset, config.build_model, 'fold_{}_model_{}.h5'.format(fold, model_number))
@@ -101,7 +149,7 @@ def train_a_fold(fold, model_number, config, x_train, y_train, x_val, y_val):
 
 	history = model.fit(x_train, y_train,
 				  epochs=epochs,
-				  batch_size=32,
+				  batch_size=batch_size,
 				  verbose=1,
 				  callbacks=[checkpoints],
 				  validation_data=(x_val, y_val))

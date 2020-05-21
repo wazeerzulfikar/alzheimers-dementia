@@ -26,7 +26,7 @@ config = EasyDict({
     # 'dataset_dir': '../ADReSS-IS2020-data/train',
 
     'dataset': 'boston',
-    'model_dir': 'models/',
+    'model_dir': 'models-2/',
     # 'model_types': ['intervention', 'pause', 'compare'],
 
     # 'training_type': 'bagging',
