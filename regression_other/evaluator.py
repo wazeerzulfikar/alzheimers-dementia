@@ -208,7 +208,7 @@ def evaluate_human(config, data):
 
 			print('\nFold ', fold, ' Model1 Train RMSE:', final_train1_rmse[-1], ' Val RMSE:', final_val1_rmse[-1], ' Train score:', final_train1_score[-1], ' Val score:', final_val1_score[-1], ' Best epoch:', best_epochs1[-1], '\n')
 			print('\nFold ', fold, ' Model2 Train RMSE:', final_train2_rmse[-1], ' Val RMSE:', final_val2_rmse[-1], ' Train score:', final_train2_score[-1], ' Val score:', final_val2_score[-1], ' Best epoch:', best_epochs2[-1], '\n')
-			print('\nFold ', fold, ' Ensemble Train RMSE:', final_train_score[-1], ' Val RMSE:', final_val_score[-1], ' Train score:', final_train_score[-1], ' Val score:', final_val_score[-1], '\n')
+			print('\nFold ', fold, ' Ensemble Train RMSE:', final_train_rmse[-1], ' Val RMSE:', final_val_rmse[-1], ' Train score:', final_train_score[-1], ' Val score:', final_val_score[-1], '\n')
 
 		# best_epochs.append(best_epoch)    
 		fold+=1
