@@ -15,11 +15,8 @@ def evaluate_n(config, data):
 	if config.mod_split == 'none':
 		evaluate_normal(config, data)
 	   
-	elif config.mod_split == 'human':
-		evaluate_human(config, data)
-
 	else:
-		evaluate_kl(config, data)
+		evaluate_human(config, data)
 
 def standard_scale(x_train, x_test):
 	scalar = StandardScaler()

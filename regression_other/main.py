@@ -42,12 +42,12 @@ config = EasyDict({
 
     
     # 'mod_split' :'none',
-    'mod_split' :'human',
-    # 'mod_split' :'computation_split',
+    # 'mod_split' :'human',
+    'mod_split' :'computation_split',
     
-    'learning_rate' : 0.05,
+    'learning_rate' : 0.1,
 
-    'epochs' : 50,
+    'epochs' : 200,
     
     'loss' : 'mse',
     
@@ -67,7 +67,8 @@ def main(config):
     create_directories(config)
 
     data = load_dataset(config)
-    
+    # print(data['X1'].shape)
+    # print(data['X2'].shape)
     evaluate_n(config, data)
 
     # # Train the ensemble models

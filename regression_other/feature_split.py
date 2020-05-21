@@ -21,6 +21,7 @@ X = df.values
 print(X.shape) # (506, 13) (506,)
 
 data = np.transpose(X)
+print(data.shape)
 # data = scale(np.transpose(X))
 
 # kmeans = KMeans(init='k-means++', n_clusters=2, n_init=10)
@@ -36,13 +37,20 @@ data = np.transpose(X)
 ######### Hierarchical Clustering based on correlation
 Y = pdist(data, 'correlation')
 linkage = linkage(Y, 'complete')
-dendrogram(linkage, color_threshold=0)
+# dendrogram(linkage, color_threshold=0)
 # predictions = fcluster(linkage, 0.5 * Y.max(), 'distance')
 predictions = fcluster(linkage, 2, 'maxclust')
-plt.show()
+# plt.show()
 
 print(data_df['feature_names'])
 print(predictions)
+
+f1 = [i for i in range(len(predictions)) if predictions[i]==1]
+f2 = [i for i in range(len(predictions)) if predictions[i]==2]
+print("data shape", data.shape)
+# print(f1, f2)
+print(data[f1].shape)
+print(data[f2].shape)
 # print('0: {} \t 1: {}'.format(list(predictions).count(0), list(predictions).count(1)))
 
 ### TAX and B together for with and without scaling
