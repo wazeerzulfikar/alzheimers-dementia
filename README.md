@@ -22,7 +22,7 @@ Alzheimer's disease is estimated to affect around 50 million people worldwide an
 
 ## Main Results
 
-### ADReSS test set
+### ADReSS Test Set
 
 | Model                 | Accuracy | Precision | Recall | F1-Score | RMSE (MMSE\*)|
 |-----------------------|----------|-----------|--------|----------|--------------|
@@ -31,7 +31,7 @@ Alzheimer's disease is estimated to affect around 50 million people worldwide an
 
 _\* Mini Mental State Exam scores_
 
-### Full DementiaBank corpus
+### Full DementiaBank Corpus
 
 | Model                 | Accuracy | Precision | Recall | F1-Score |
 |-----------------------|----------|-----------|--------|----------|
@@ -55,7 +55,7 @@ Request access from [DementiaBank](https://dementia.talkbank.org/)
 ### Setup
 
 1. Install dependencies using `pip install -r requirements.txt`
-2. Install and setup OpenSmile for Compare features extraction following [COMPARE.md]()
+2. Install and setup OpenSmile for Compare features extraction following [COMPARE.md](https://github.com/wazeerzulfikar/ad-mmse/blob/master/COMPARE.md)
 3. Extract compare features
 
 ### Run
@@ -80,13 +80,3 @@ If you find this project useful for your research, please use the following BibT
       booktitle={xxxxxxxx},
       year={2020}
     }
-
-### Compare features extraction
-
-1. Download the [opensmile](https://www.audeering.com/opensmile/) toolkit.
-2. `tar -zxvf openSMILE-2.x.x.tar.gz`
-3. `cd openSMILE-2.x.x`
-4. `bash autogen.sh`
-5. `make -j4`
-6. `make`
-7. `make install`
