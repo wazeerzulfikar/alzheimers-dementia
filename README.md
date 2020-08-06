@@ -2,7 +2,7 @@
 
 Code for the paper - link
 
-This work was also submitted to the Alzheimer's Dementia Recognition through Spontaneous Speech (ADReSS) [challenge](http://www.homepages.ed.ac.uk/sluzfil/ADReSS/)
+This work was also submitted to the [Alzheimer's Dementia Recognition through Spontaneous Speech (ADReSS) challenge](http://www.homepages.ed.ac.uk/sluzfil/ADReSS/)
 
 ## Dataset Download
 
@@ -10,14 +10,13 @@ Request access from [DementiaBank](https://dementia.talkbank.org/)
 
 ## Setup
 
-Install dependencies using `pip install -r requirements.txt`
-Install and setup OpenSmile for Compare features extraction
+1. Install dependencies using `pip install -r requirements.txt`
+2. Install and setup OpenSmile for Compare features extraction
+3. Extract compare features
 
 ## Run
 
-Extract compare features
-
-Set config parameters and then `python main.py`
+Set config parameters and run `python main.py`
 
 ## Results
 
@@ -25,7 +24,7 @@ Set config parameters and then `python main.py`
 
 | Model                 | Accuracy | Precision | Recall | F1-Score | RMSE (MMSE\*)|
 |-----------------------|----------|-----------|--------|----------|--------------|
-| Luz et al.            | 0.63     | 0.60      | 0.75   | 0.67     | 6.14         |
+| Luz et al.            | 0.75     | **0.83**      | 0.62   | 0.71     | 5.21         |
 | Sarawgi et al. (Ours) | **0.83**     | **0.83**     | **0.83**   | **0.83**     | **4.60**         |
 
 \* Mini Mental State Exam scores
@@ -42,7 +41,14 @@ Set config parameters and then `python main.py`
 *Above results are using 10 fold cross validation*
 
 ## Model Architecture
+We use an Ensemble model of (1) Disfluency, (2) Acoustic, and (3) Inter-ventions models for AD classification.
+Then (4) Regression module is added at the top of the Ensemble for MMSE regression.
 
+![model architecture](https://github.com/wazeerzulfikar/ad-mmse/blob/master/img/model_final.jpeg)
+
+## Individual modal performance on ADReSS
+
+![roc](https://github.com/wazeerzulfikar/ad-mmse/blob/master/img/roc.png)
 
 ### Compare features extraction
 
