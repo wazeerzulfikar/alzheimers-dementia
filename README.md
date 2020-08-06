@@ -1,8 +1,8 @@
 # Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity
 
-> [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://github.com/wazeerzulfikar/ad-mmse/blob/master)
-> Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Nouran Soliman, Pattie Maes
-> To appear in INTERSPEECH 2020
+> [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://github.com/wazeerzulfikar/ad-mmse/blob/master)   
+> Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Nouran Soliman, Pattie Maes  
+> To appear in INTERSPEECH 2020  
 
 This work was also submitted to the [Alzheimer's Dementia Recognition through Spontaneous Speech (ADReSS) challenge](http://www.homepages.ed.ac.uk/sluzfil/ADReSS/)
 
@@ -29,7 +29,7 @@ Alzheimer's disease is estimated to affect around 50 million people worldwide an
 | Luz et al.            | 0.75     | **0.83**      | 0.62   | 0.71     | 5.21         |
 | Sarawgi et al. (Ours) | **0.83**     | **0.83**     | **0.83**   | **0.83**     | **4.60**         |
 
-\* Mini Mental State Exam scores
+_\* Mini Mental State Exam scores_
 
 ### Full DementiaBank corpus
 
@@ -55,7 +55,7 @@ Request access from [DementiaBank](https://dementia.talkbank.org/)
 ### Setup
 
 1. Install dependencies using `pip install -r requirements.txt`
-2. Install and setup OpenSmile for Compare features extraction
+2. Install and setup OpenSmile for Compare features extraction following [COMPARE.md]()
 3. Extract compare features
 
 ### Run
@@ -72,7 +72,14 @@ Then (4) Regression module is added at the top of the Ensemble for MMSE regressi
 
 ## Citation
 
-If you find this project useful for your research, please cite using the following entry
+If you find this project useful for your research, please use the following BibTeX entry.
+
+    @inproceedings{xxxxx,
+      title={xxxx},
+      author={Sarawgi, Zulfikar, Soliman, Maes},
+      booktitle={xxxxxxxx},
+      year={2020}
+    }
 
 ### Compare features extraction
 
