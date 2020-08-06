@@ -70,6 +70,8 @@ Then (4) Regression module is added at the top of the Ensemble for MMSE regressi
 
 ## License
 
+This code is released under the MIT License (refer to the [LICENSE](https://github.com/wazeerzulfikar/ad-mmse/blob/master/LICENSE) for details).
+
 ## Citation
 
 If you find this project useful for your research, please use the following BibTeX entry.
