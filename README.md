@@ -60,7 +60,7 @@ Request access from [DementiaBank](https://dementia.talkbank.org/)
 
 ### Run
 
-Set config parameters in `main.py` and run `python main.py`
+Set config parameters in `config.py` and run `python main.py`
 
 ### Model Architecture
 We use an Ensemble model of (1) Disfluency, (2) Acoustic, and (3) Inter-ventions models for AD classification.
