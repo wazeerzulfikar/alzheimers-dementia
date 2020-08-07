@@ -19,7 +19,7 @@ Download the [opensmile](https://www.audeering.com/opensmile/) toolkit. You will
 6. `make install`
   
 ## How to use it
-Place [generate_compare_feats.sh]() script in the directory you want to create the compare features inside. Change the paths as described in the comments of the generate_compare_feats.sh script. Run the script using the terminal and you should automatically get compare features (inside the directory you placed the script in) for all audio files you provided the path to in the script (for each audio file a csv file is created with its compare features).    
+Place [generate_compare_feats.sh](https://github.com/wazeerzulfikar/ad-mmse/blob/master/generate_compare_feats.sh) script in the directory you want to create the compare features inside. Change the paths as described in the comments of the generate_compare_feats.sh](https://github.com/wazeerzulfikar/ad-mmse/blob/master/generate_compare_feats.sh) script. Run the script using the terminal and you should automatically get compare features (inside the directory you placed the script in) for all audio files you provided the path to in the script (for each audio file a csv file is created with its compare features).    
 
 Voila! You have all your compare features!
 
