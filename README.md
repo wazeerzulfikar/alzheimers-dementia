@@ -22,12 +22,21 @@ Alzheimer's disease is estimated to affect around 50 million people worldwide an
 
 ## Main Results
 
-### ADReSS Test Set
+### ADReSS
+
+### Test Set
 
 | Model                 | Accuracy | Precision | Recall | F1-Score | RMSE (MMSE\*)|
 |-----------------------|----------|-----------|--------|----------|--------------|
 | Luz et al.            | 0.75     | **0.83**      | 0.62   | 0.71     | 5.21         |
-| Sarawgi et al. (Ours) | **0.83**     | **0.83**     | **0.83**   | **0.83**     | **4.60**         |
+| Sarawgi et al. (_ours_) | **0.83**     | **0.83**     | **0.83**   | **0.83**     | **4.60**         |
+
+### LOSO (LOOCV) on dataset
+
+| Model                 | Accuracy | Precision | Recall | F1-Score | RMSE (MMSE\*)|
+|-----------------------|----------|-----------|--------|----------|--------------|
+| Luz et al.            | 0.77     |  0.77     | 0.76   | 0.77     | 4.38         |
+| Sarawgi et al. (_ours_) | **0.99**     | **0.99**     | **1.0**   | **0.99**     | **0.82**         |
 
 _\* Mini Mental State Exam scores_
 
@@ -38,7 +47,7 @@ _\* Mini Mental State Exam scores_
 | Fraser et al.         | 0.82     | -         | -      | -        |
 | Masrani               | 0.85     | -         | -      | 0.85     |
 | Kong et al.           | 0.87     | 0.86      | **0.91**   | **0.88**     |
-| Sarawgi et al. (Ours) | **0.88**     | **0.92**      | 0.82   | **0.88**     |
+| Sarawgi et al. (_ours_) | **0.88**     | **0.92**      | 0.82   | **0.88**     |
 
 *Above results for DementiaBank are using 10 fold cross validation*
 
