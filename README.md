@@ -42,7 +42,7 @@ _\* Mini Mental State Exam scores_
 
 *Above results for DementiaBank are using 10 fold cross validation*
 
-### Individual modal performance on ADReSS test set
+### Individual modal performance on ADReSS dataset
 
 ![roc](https://github.com/wazeerzulfikar/ad-mmse/blob/master/img/roc.png)
 
