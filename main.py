@@ -23,8 +23,5 @@ def main(config):
 	# Evaluate the model
 	evaluator.evaluate(data, config)
 
-	# Write out test results (todo)
-	# test_writer.test(test_filename, dataset_dir, test_dataset_dir, model_dir, model_types, voting_type=voting_type, select_fold=None)
-
 if __name__ == '__main__':
 	main(config)

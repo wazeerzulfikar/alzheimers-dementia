@@ -1,9 +1,0 @@
-#!/bin/bash
-
-for entry in /Users/nouransoliman/Desktop/nlp\ project/untitled\ folder/ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/*;
-do
-  fn=${entry%.*}
-  SMILExtract -C /Users/nouransoliman/Desktop/opensmile-2.3.0/config/IS13_ComParE.conf -I "$entry" -O "compare_${fn##*/}.csv"
-done
-
-#SMILExtract -C /Users/nouransoliman/Desktop/opensmile-2.3.0/config/IS13_ComParE.conf -I /Users/nouransoliman/Desktop/nlp\ project/untitled\ folder/ADReSS-IS2020-data/train/Full_wave_enhanced_audio/cc/S001.wav -O compare_s001.csv
