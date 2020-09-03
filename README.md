@@ -1,6 +1,6 @@
 # Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity
 
-> [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://github.com/wazeerzulfikar/ad-mmse/blob/master)[Link will be updated on 12 August]  
+> [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://arxiv.org/abs/2009.00700)
 > Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Nouran Soliman, Pattie Maes  
 > To appear in INTERSPEECH 2020  
 
