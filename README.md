@@ -85,9 +85,9 @@ This code is released under the MIT License (refer to the [LICENSE](https://gith
 
 If you find this project useful for your research, please use the following BibTeX entry.
 
-    @inproceedings{xxxxx,
-      title={xxxx},
-      author={Sarawgi, Zulfikar, Soliman, Maes},
-      booktitle={xxxxxxxx},
+    @article{sarawgi2020multimodal,
+      title={Multimodal Inductive Transfer Learning for Detection of Alzheimer's Dementia and its Severity},
+      author={Sarawgi, Utkarsh and Zulfikar, Wazeer and Soliman, Nouran and Maes, Pattie},
+      journal={arXiv preprint arXiv:2009.00700},
       year={2020}
     }
