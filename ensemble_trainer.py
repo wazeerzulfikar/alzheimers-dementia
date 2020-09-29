@@ -34,7 +34,13 @@ def boosted_train_a_fold(
 	elif config.task == 'regression':
 		y = data['y_reg']
 
-	booster_model = tf.keras.models.load_model(os.path.join(config.model_dir, booster_model_type, 'fold_{}.h5'.format(fold)))
+	if config.uncertainty:
+		def negloglik(y, p_y):
+			return -p_y.log_prob(y)
+		booster_model = tf.keras.models.load_model(os.path.join(config.model_dir, booster_model_type, 'fold_{}.h5'.format(fold)),
+			custom_objects={'negloglik': negloglik})
+	else:
+		booster_model = tf.keras.models.load_model(os.path.join(config.model_dir, booster_model_type, 'fold_{}.h5'.format(fold)))
 
 	# special stuff for compare features
 	if booster_model_type == 'compare':
@@ -53,7 +59,11 @@ def boosted_train_a_fold(
 
 	booster_losses = []
 	for idx, x in enumerate(X1):
-		loss = booster_model.evaluate(np.expand_dims(x, axis=0), np.expand_dims(y[idx], axis=0), verbose=0)[0]
+		if config.uncertainty:
+			loss = booster_model(np.expand_dims(x, axis=0)).stddev().numpy()[0][0]
+			print(loss)
+		else:
+			loss = booster_model.evaluate(np.expand_dims(x, axis=0), np.expand_dims(y[idx], axis=0), verbose=0)
 		booster_losses.append(loss)
 
 	boost_probs = [float(i)/sum(booster_losses) for i in booster_losses] # normalizing losses into probs to sum to 1
