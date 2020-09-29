@@ -1,13 +1,15 @@
 import utils
 
 config = utils.EasyDict({
-	'task': 'classification',
-	# 'task': 'regression',
+	# 'task': 'classification',
+	'task': 'regression',
+
+	'uncertainty': False,
 
 	# 'dataset_dir': '../DementiaBank'
-	'dataset_dir': '../ADReSS-IS2020-data/train',
+	'dataset_dir': '../../alzheimers/ADReSS-IS2020-data/train',
 
-	'model_dir': 'models/bagging',
+	'model_dir': 'models/uncertainty/1',
 	'model_types': ['intervention', 'pause', 'compare'],
 
 	'training_type': 'bagging',
@@ -26,5 +28,10 @@ config = utils.EasyDict({
 	'longest_speaker_length': 32,
 	'n_pause_features': 11,
 	'compare_features_size': 21,
-	'split_reference': 'samples'
+	'split_reference': 'samples',
+
+	'n_epochs': 1000,
+	'batch_size': 8,
+	'lr': 0.01,
+	'verbose': 1
 })

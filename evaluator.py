@@ -33,10 +33,21 @@ def evaluate(data, config):
 
 	saved_model_types = {}
 
-	for m in model_types:
-		model_files = sorted(glob.glob(os.path.join(model_dir, '{}/*.h5'.format(m))))
-		saved_models = list(map(lambda x: tf.keras.models.load_model(x), model_files))
-		saved_model_types[m] = saved_models
+	if config.uncertainty:
+		
+		def negloglik(y, p_y):
+			return -p_y.log_prob(y)
+
+		for m in model_types:
+			model_files = sorted(glob.glob(os.path.join(model_dir, '{}/*.h5'.format(m))))
+			saved_models = list(map(lambda x: tf.keras.models.load_model(x, custom_objects={'negloglik': negloglik})
+				, model_files))
+			saved_model_types[m] = saved_models
+	else:
+		for m in model_types:
+			model_files = sorted(glob.glob(os.path.join(model_dir, '{}/*.h5'.format(m))))
+			saved_models = list(map(lambda x: tf.keras.models.load_model(x), model_files))
+			saved_model_types[m] = saved_models
 
 	print('Loading models from {}'.format(model_dir))
 	print('Using {} on {}'.format(voting_type, dataset_split))

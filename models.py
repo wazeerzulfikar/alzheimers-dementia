@@ -1,8 +1,11 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
+import tensorflow_probability as tfp
 
-def create_intervention_model(task, longest_speaker_length):
+tfd = tfp.distributions
+
+def create_intervention_model(task, longest_speaker_length, uncertainty):
 	model = tf.keras.Sequential()
 	model.add(layers.LSTM(16, input_shape=(longest_speaker_length, 3)))
 	model.add(layers.BatchNormalization())
@@ -14,14 +17,20 @@ def create_intervention_model(task, longest_speaker_length):
 		model.add(layers.Dense(2, activation='softmax'))
 
 	elif task == 'regression':
-		model.add(layers.Dense(16, activation='relu'))
-		model.add(layers.Dense(8, activation='relu'))
-		model.add(layers.Dense(1))
-		model.add(layers.ReLU(max_value=30))
+		if uncertainty:
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(2))
+			model.add(tfp.layers.DistributionLambda(
+				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))
+		else:
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(8, activation='relu'))
+			model.add(layers.Dense(1))
+			model.add(layers.ReLU(max_value=30))
 
 	return model
 
-def create_pause_model(task, n_features):
+def create_pause_model(task, n_features, uncertainty):
 	model = tf.keras.Sequential()
 	model.add(layers.Input(shape=(n_features,)))
 	model.add(layers.BatchNormalization())
@@ -42,14 +51,20 @@ def create_pause_model(task, n_features):
 		model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 
 	elif task == 'regression':
-		model.add(layers.Dense(16, activation='relu'))
-		model.add(layers.Dense(16, activation='relu'))
-		model.add(layers.Dense(1))
-		model.add(layers.ReLU(max_value=30))
+		if uncertainty:
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(2))
+			model.add(tfp.layers.DistributionLambda(
+				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))
+		else:
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(1))
+			model.add(layers.ReLU(max_value=30))
 
 	return model
 
-def create_compare_model(task, features_size):
+def create_compare_model(task, features_size, uncertainty):
 
 	model = tf.keras.Sequential()
 	model.add(layers.Input(shape=(features_size,)))
@@ -61,11 +76,17 @@ def create_compare_model(task, features_size):
 		model.add(layers.Dense(2, activation='softmax', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
 
 	elif task == 'regression':
-		model.add(layers.Dense(8, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-		model.add(layers.Dense(8, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-		model.add(layers.Dropout(0.5))
-		model.add(layers.Dense(1, kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
-		model.add(layers.ReLU(max_value=30))
+		if uncertainty:
+			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dense(2))
+			model.add(tfp.layers.DistributionLambda(
+				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))
+		else:
+			model.add(layers.Dense(8, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+			model.add(layers.Dense(8, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+			model.add(layers.Dropout(0.5))
+			model.add(layers.Dense(1, kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01)))
+			model.add(layers.ReLU(max_value=30))
 	return model
 
 def create_spectogram_model(spectogram_size):
