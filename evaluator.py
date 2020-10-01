@@ -9,20 +9,22 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import precision_recall_fscore_support, mean_squared_error
 import numpy as np
+from pickle import load
 np.random.seed(0)
 
 # Local imports
 import dataset
 
-# def evaluate(task, data, model_dir, model_types, voting_type='hard_voting', dataset_split='full_dataset', n_folds = 5):
-def evaluate(data, config):
+def evaluate(data, test_data, config):
 	print('Loading data...')
 
 	if config.task == 'classification':
 		y = data['y_clf']
+		y_test = test_data['y_clf']
 
 	elif config.task == 'regression':
 		y = data['y_reg']
+		y_test = test_data['y_reg']
 
 	model_dir = config.model_dir
 	model_types = config.model_types
@@ -30,11 +32,12 @@ def evaluate(data, config):
 	dataset_split = config.dataset_split
 	n_folds = config.n_folds
 	task = config.task
+	fold=0
 
 	saved_model_types = {}
 
 	if config.uncertainty:
-		
+
 		def negloglik(y, p_y):
 			return -p_y.log_prob(y)
 
@@ -55,29 +58,100 @@ def evaluate(data, config):
 
 	train_accuracies = []
 	val_accuracies = []
+	test_accuracies = []
 
-	# if dataset_split == 'full_dataset': # compare features need to be projected
-	# 	if len(model_types) == 1:
-	# 		if m == 'compare':
-	# 			m = model_types[0]
-	# 			accuracy = get_individual_accuracy(saved_model_types[m][0], X_compare, y)
-	# 		else:
-	# 			m = model_types[0]
-	# 			accuracy = get_individual_accuracy(saved_model_types[m][0], data[m], y)
-	# 	else:
-	# 		models = []
-	# 		features = []
-	# 		for m in model_types:
-	# 			models.append(saved_model_types[m][2])
-	# 			if m == 'compare':
-	# 				features.append(X_compare)
-	# 			else:	
-	# 				features.append(data[m])
-	# 		print('Full dataset')
-	# 		accuracy, learnt_voter = get_ensemble_accuracy(models, features, y, voting_type)
+	if dataset_split == 'full_dataset': # compare features need to be projected
+
+		numpy_seeds = [913293, 653261, 84754, 645, 13451235]
+
+		for i in range(len(numpy_seeds)):
+			np.random.seed(numpy_seeds[i])
+
+			p = np.random.permutation(len(y))
+			for m in model_types:
+				data[m] = data[m][p]
+			y = y[p]
+
+			n_train = int(config.split_ratio * len(y))
+			compare_train, compare_val = data['compare'][:n_train], data['compare'][n_train:]
+			compare_test = test_data['compare']
+			y_train, y_val = y[:n_train], y[n_train:]
+
+			sc = load(open(os.path.join(config.model_dir, 'compare/scaler_{}.pkl'.format(fold+1)), 'rb'))
+			pca = load(open(os.path.join(config.model_dir, 'compare/pca_{}.pkl'.format(fold+1)), 'rb'))
+
+			compare_train = sc.transform(compare_train)
+			compare_train = pca.transform(compare_train)
+			compare_val = sc.transform(compare_val)
+			compare_val = pca.transform(compare_val)
+			compare_test = sc.transform(compare_test)
+			compare_test = pca.transform(compare_test)
+
+			if len(model_types) == 1:
+				m = model_types[0]
+				if m == 'compare':
+					print('Fold {}'.format(fold+1))
+					print('Train')
+					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_train, y_train, fold=fold)
+					print('Val')
+					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_val, y_val, fold=fold)
+					print('Test')
+					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_test, y_val, fold=fold)
+
+
+				else:
+					print('Fold {}'.format(fold+1))
+					print('Train')
+					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][:n_train], y_train, fold=fold)
+					print('Val')
+					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][n_train:], y_val, fold=fold)
+					print('Test')
+					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], test_data[m], y_val, fold=fold)
+
+			else:
+
+				models = []
+				features = []
+				for m in model_types:
+					models.append(saved_model_types[m][fold])
+					if m == 'compare':
+						features.append(compare_train)
+					else:	
+						features.append(data[m][:n_train])
+
+				print('Fold {}'.format(fold+1))
+				print('Train')
+				train_accuracy, learnt_voter = get_ensemble_accuracy(task, models, features, y_train, voting_type)
+
+				print('Val')
+				features = []
+				for m in model_types:
+					if m == 'compare':
+						features.append(compare_val)
+					else:	
+						features.append(data[m][n_train:])
+				val_accuracy, _ = get_ensemble_accuracy(task, models, features, y_val, voting_type, learnt_voter=learnt_voter,  fold=fold)
+
+
+				print('Test')
+				features = []
+				for m in model_types:
+					if m == 'compare':
+						features.append(compare_test)
+					else:	
+						features.append(test_data[m])
+				test_accuracy, _ = get_ensemble_accuracy(task, models, features, y_test, voting_type, learnt_voter=learnt_voter,  fold=fold)
+
+				print('----'*10)
+
+			train_accuracies.append(train_accuracy)
+			val_accuracies.append(val_accuracy)
+			test_accuracies.append(test_accuracy)
+
+			fold+=1
+
 
 	if dataset_split == 'k_fold':
-		fold = 0
 		
 		for train_index, val_index in KFold(n_folds).split(y):
 			compare_train, compare_val = data['compare'][train_index], data['compare'][val_index]
@@ -140,14 +214,19 @@ def evaluate(data, config):
 
 			train_accuracies.append(train_accuracy)
 			val_accuracies.append(val_accuracy)
+			test_accuracies.append(test_accuracy)
 
 			fold+=1
 
-		print('Train mean: {:.3f}'.format(np.mean(train_accuracies)))
-		print('Train std: {:.3f}'.format(np.std(train_accuracies)))
-		if len(val_accuracies) > 0:
-			print('Val mean: {:.3f}'.format(np.mean(val_accuracies)))
-			print('Val std: {:.3f}'.format(np.std(val_accuracies)))
+	print('Train mean: {:.3f}'.format(np.mean(train_accuracies)))
+	print('Train std: {:.3f}'.format(np.std(train_accuracies)))
+	if len(val_accuracies) > 0:
+		print('Val mean: {:.3f}'.format(np.mean(val_accuracies)))
+		print('Val std: {:.3f}'.format(np.std(val_accuracies)))
+	if len(test_accuracies) > 0:
+		print('Test mean: {:.3f}'.format(np.mean(test_accuracies)))
+		print('Test std: {:.3f}'.format(np.std(test_accuracies)))
+
 
 def get_individual_accuracy(task, model, feature, y, fold=None):
 

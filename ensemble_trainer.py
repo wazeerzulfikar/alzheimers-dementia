@@ -4,6 +4,7 @@ import tensorflow as tf
 from sklearn.model_selection import KFold
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from pickle import load
 
 import dataset
 import trainer
@@ -44,24 +45,15 @@ def boosted_train_a_fold(
 
 	# special stuff for compare features
 	if booster_model_type == 'compare':
-		fold_ = 0
-		for train_index, val_index in KFold(n_split).split(X1):
-			compare_train = X1[train_index]
-			if fold_ == fold:
-				break
-			fold_+=1
-		sc = StandardScaler()
-		sc.fit(compare_train)
+		sc = load(open(os.path.join(config.model_dir, 'compare/scaler_{}.pkl'.format(fold)), 'rb'))
+		pca = load(open(os.path.join(config.model_dir, 'compare/pca_{}.pkl'.format(fold)), 'rb'))
 		X1 = sc.transform(X1)
-		pca = PCA(n_components=config.compare_features_size)
-		pca.fit(compare_train)
 		X1 = pca.transform(X1)
 
 	booster_losses = []
 	for idx, x in enumerate(X1):
 		if config.uncertainty:
 			loss = booster_model(np.expand_dims(x, axis=0)).stddev().numpy()[0][0]
-			print(loss)
 		else:
 			loss = booster_model.evaluate(np.expand_dims(x, axis=0), np.expand_dims(y[idx], axis=0), verbose=0)
 		booster_losses.append(loss)

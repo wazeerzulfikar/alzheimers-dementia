@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
+from pickle import dump
 
 import models
 
@@ -34,19 +35,40 @@ def train_n_folds(model_type, data, config):
 	elif config.split_reference == 'subjects':
 		splitter = subjects
 
-	for train_index, val_index in KFold(config.n_folds).split(splitter):
-		fold+=1
+	if config.dataset_split == 'kfold':
+		for train_index, val_index in KFold(config.n_folds).split(splitter):
+			fold+=1
 
-		if config.split_reference == 'samples':
-			x_train, x_val = x[train_index], x[val_index]
-			y_train, y_val = y[train_index], y[val_index]
+			if config.split_reference == 'samples':
+				x_train, x_val = x[train_index], x[val_index]
+				y_train, y_val = y[train_index], y[val_index]
 
-		results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config)
-		train_accuracy, val_accuracy= results
+			results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config)
+			train_accuracy, val_accuracy= results
 
-		train_accuracies.append(train_accuracy)
-		val_accuracies.append(val_accuracy)
-	
+			train_accuracies.append(train_accuracy)
+			val_accuracies.append(val_accuracy)
+	else:
+		numpy_seeds = [913293, 653261, 84754, 645, 13451235]
+
+		for i in range(len(numpy_seeds)):
+			fold+=1
+			np.random.seed(numpy_seeds[i])
+
+			p = np.random.permutation(len(x))
+			x = x[p]
+			y = y[p]
+
+			n_train = int(config.split_ratio * len(x))
+			x_train, x_val = x[:n_train], x[n_train:]
+			y_train, y_val = y[:n_train], y[n_train:]
+
+			results = train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config)
+			train_accuracy, val_accuracy= results
+
+			train_accuracies.append(train_accuracy)
+			val_accuracies.append(val_accuracy)
+
 	return train_accuracies, val_accuracies
 
 def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
@@ -76,6 +98,9 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
 
 		x_train = pca.transform(x_train)
 		x_val = pca.transform(x_val)
+
+		dump(sc, open(os.path.join(config.model_dir, 'compare/scaler_{}.pkl'.format(fold)), 'wb'))
+		dump(pca, open(os.path.join(config.model_dir, 'compare/pca_{}.pkl'.format(fold)), 'wb'))
 
 	save_weights_only = False
 

@@ -8,17 +8,19 @@ config = utils.EasyDict({
 
 	# 'dataset_dir': '../DementiaBank'
 	'dataset_dir': '../../alzheimers/ADReSS-IS2020-data/train',
+	'test_dataset_dir': '../../alzheimers/ADReSS-IS2020-data/test',
 
-	'model_dir': 'models/uncertainty_boost/2',
-	'model_types': ['intervention', 'pause', 'compare'],
+	'model_dir': 'models/uncertainty_boost/test',
+	'model_types': ['intervention', 'compare', 'pause'],
 
 	# 'training_type': 'bagging',
 	'training_type' :'boosting',
 
 	'n_folds': 5,
 
-	# 'dataset_split' :'full_dataset',
-	'dataset_split' :'k_fold',
+	'dataset_split' :'full_dataset',
+	# 'dataset_split' :'k_fold',
+	'split_ratio': 0.8,
 
 	'voting_type': 'hard_voting',
 	# 'voting_type': 'soft_voting',
@@ -30,8 +32,8 @@ config = utils.EasyDict({
 	'compare_features_size': 21,
 	'split_reference': 'samples',
 
-	'n_epochs': 1000,
+	'n_epochs': 2000,
 	'batch_size': 16,
-	'lr': 0.01,
+	'lr': 0.001,
 	'verbose': 0
 })

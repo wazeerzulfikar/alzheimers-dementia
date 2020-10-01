@@ -123,6 +123,17 @@ def get_regression_values(metadata_filename):
 
     return values
 
+def get_classification_values(metadata_filename):
+    values = []
+    with open(metadata_filename, 'r') as f:
+        content = f.readlines()[1:]
+        for idx, line in enumerate(content):
+            token = line.split('; ')[-2].strip('\n')
+            if token!='NA':  values.append(int(token))
+            else:   values.append(30) # NA fill value
+
+    return values
+
 def get_audio_length(filename):
     with contextlib.closing(wave.open(filename,'r')) as f:
         frames = f.getnframes()

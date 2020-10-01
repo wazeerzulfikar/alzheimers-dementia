@@ -92,11 +92,10 @@ def get_compare_features(compare_filename):
     return compare_features_floats
 
 
-def prepare_data(config):
+def prepare_data(dataset_dir, config):
 	'''
 	Prepare all data
 	'''
-	dataset_dir = config.dataset_dir
 	################################## SUBJECTS ################################
 
 	subject_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*/*.cha')))
@@ -223,6 +222,59 @@ def prepare_data(config):
 	X_compare = X_compare[p]
 	y = y[p]
 	y_reg = y_reg[p]
+
+	return {
+		'intervention': X_intervention,
+		'pause': X_pause,
+		'compare': X_compare,
+		'y_clf': y,
+		'y_reg': y_reg,
+		'subjects': subjects
+	}
+
+
+def prepare_test_data(dataset_dir, config):
+
+	'''
+	Prepare test data
+	'''
+	################################## SUBJECTS ################################
+
+	subject_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
+	subjects = np.array(sorted(list(set([re.split('[/-]', i)[-2] for i in subject_files]))))
+
+	######################################################################
+
+	################################## INTERVENTION ####################################
+
+	transcription_files = sorted(glob.glob(os.path.join(dataset_dir, 'transcription/*.cha')))
+	all_speakers = []
+	for filename in transcription_files:
+		all_speakers.append(get_intervention_features(filename, config.longest_speaker_length))	
+	X_intervention = np.array(all_speakers)
+
+
+	################################## PAUSE ####################################
+
+	audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/*.wav')))
+
+	all_counts = []
+	for t_f, a_f in zip(transcription_files, audio_files):
+		pause_features = get_pause_features(t_f, a_f)
+		all_counts.append(pause_features)
+	X_pause = np.array(all_counts)
+
+
+	################################## COMPARE ####################################
+	compare_files = sorted(glob.glob(os.path.join(dataset_dir, 'compare/*.csv')))
+	X_compare = np.array([get_compare_features(f) for f in compare_files])
+
+	y = utils.get_classification_values(os.path.join(dataset_dir, 'meta_data.txt'))
+	y_reg = utils.get_regression_values(os.path.join(dataset_dir, 'meta_data.txt'))
+
+
+	assert X_intervention.shape[0]==X_pause.shape[0], '~ Data streams are different ~'
+	print('~ Data streams verified ~')
 
 	return {
 		'intervention': X_intervention,
