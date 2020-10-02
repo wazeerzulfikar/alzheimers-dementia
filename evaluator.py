@@ -151,7 +151,7 @@ def evaluate(data, test_data, config):
 			val_accuracies.append(val_accuracy)
 			test_accuracies.append(test_accuracy)
 
-			if config.uncertainty:
+			if config.uncertainty and config.voting_type=='uncertainty_voting':
 				average_uncertainties.append(average_results[0])
 				average_entropies.append(average_results[1])
 
@@ -234,7 +234,7 @@ def evaluate(data, test_data, config):
 		print('Test mean: {:.3f}'.format(np.mean(test_accuracies)))
 		print('Test std: {:.3f}'.format(np.std(test_accuracies)))
 
-	if config.uncertainty:
+	if config.uncertainty and config.voting_type=='uncertainty_voting':
 		print('Test Average Uncertainties: ', list(np.mean(average_uncertainties, axis=0)))
 		print('Test Average Entropies: ', list(np.mean(average_entropies, axis=0)))
 
