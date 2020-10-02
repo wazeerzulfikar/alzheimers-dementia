@@ -62,7 +62,7 @@ def boosted_train_a_fold(
 		booster_losses.append(loss)
 
 	boost_probs = [float(i)/sum(booster_losses) for i in booster_losses] # normalizing losses into probs to sum to 1
-	train_index = np.random.choice(len(y), 86, replace=False, p=boost_probs)
+	train_index = np.random.choice(len(y), size=int(config.split_ratio*len(boost_probs)), replace=False, p=boost_probs)
 	val_index = np.array([i for i in np.arange(len(y)) if i not in train_index])
 
 	x_train, x_val = X2[train_index], X2[val_index]

@@ -9,6 +9,8 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import precision_recall_fscore_support, mean_squared_error
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 from pickle import load
 np.random.seed(0)
 
@@ -95,24 +97,20 @@ def evaluate(data, test_data, config):
 				if m == 'compare':
 					print('Fold {}'.format(fold+1))
 					print('Train')
-					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_train, y_train, fold=fold)
+					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_train, y_train, config, fold=fold)
 					print('Val')
-					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_val, y_val, fold=fold)
+					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_val, y_val, config, fold=fold)
 					print('Test')
-					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_test, y_val, fold=fold)
-
-
+					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], compare_test, y_test, config, fold=fold)
 				else:
 					print('Fold {}'.format(fold+1))
 					print('Train')
-					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][:n_train], y_train, fold=fold)
+					train_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][:n_train], y_train, config, fold=fold)
 					print('Val')
-					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][n_train:], y_val, fold=fold)
+					val_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], data[m][n_train:], y_val, config, fold=fold)
 					print('Test')
-					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], test_data[m], y_val, fold=fold)
-
+					test_accuracy = get_individual_accuracy(task, saved_model_types[m][fold], test_data[m], y_test, config, fold=fold)
 			else:
-
 				models = []
 				features = []
 				for m in model_types:
@@ -135,7 +133,6 @@ def evaluate(data, test_data, config):
 						features.append(data[m][n_train:])
 				val_accuracy, _, _ = get_ensemble_accuracy(task, models, features, y_val, config, learnt_voter=learnt_voter,  fold=fold)
 
-
 				print('Test')
 				features = []
 				for m in model_types:
@@ -143,7 +140,7 @@ def evaluate(data, test_data, config):
 						features.append(compare_test)
 					else:	
 						features.append(test_data[m])
-				test_accuracy, _, average_results = get_ensemble_accuracy(task, models, features, y_test, config, learnt_voter=learnt_voter,  fold=fold)
+				test_accuracy, _, average_results = get_ensemble_accuracy(task, models, features, y_test, config, learnt_voter=learnt_voter,  fold=fold, plot=config.plot)
 
 				print('----'*10)
 
@@ -151,7 +148,7 @@ def evaluate(data, test_data, config):
 			val_accuracies.append(val_accuracy)
 			test_accuracies.append(test_accuracy)
 
-			if config.uncertainty:
+			if config.uncertainty  and len(config.model_types) > 1:
 				average_uncertainties.append(average_results[0])
 				average_entropies.append(average_results[1])
 
@@ -234,12 +231,12 @@ def evaluate(data, test_data, config):
 		print('Test mean: {:.3f}'.format(np.mean(test_accuracies)))
 		print('Test std: {:.3f}'.format(np.std(test_accuracies)))
 
-	if config.uncertainty:
+	if config.uncertainty and len(config.model_types) > 1:
 		print('Test Average Uncertainties: ', list(np.mean(average_uncertainties, axis=0)))
 		print('Test Average Entropies: ', list(np.mean(average_entropies, axis=0)))
 
 
-def get_individual_accuracy(task, model, feature, y, fold=None):
+def get_individual_accuracy(task, model, feature, y, config, fold=None):
 
 	if task == 'classification':
 		preds = model.predict(feature)
@@ -250,14 +247,17 @@ def get_individual_accuracy(task, model, feature, y, fold=None):
 		return accuracy
 
 	elif task == 'regression':
-		y = np.array(y)
-		preds = model.predict(feature)
+		if config.uncertainty:
+			preds = model(feature).mean().numpy()
+		else:
+			preds = model.predict(feature)
 
-		print(len([i for i in preds if i>=26]))
+		y = np.array(y)
 		score = mean_squared_error(np.expand_dims(y, axis=-1), preds, squared=False)
+		print('rmse ', score)
 		return score
 
-def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, learnt_voter=None, fold=None):
+def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, learnt_voter=None, fold=None, plot=False):
 	
 	if task == 'classification':
 		probs = []
@@ -344,10 +344,32 @@ def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, lear
 			print('Average Uncertainties ', average_uncertainties)
 			print('Average Entropies ', average_entropies)
 
+		if plot:
+			plot_entropy(pred_entropies, fold, config)
+
 		score = mean_squared_error(np.expand_dims(y, axis=-1), voted_predictions, squared=False)
 		print('rmse: {:.3f}'.format(score))
 
 		if config.task == 'regression' and config.uncertainty:
 			return score, None, [average_uncertainties, average_entropies]
 		return score, None, None
+
+def plot_entropy(entropies, fold, config):
+
+	for i in range(3):
+		b = sns.distplot(entropies[:,i,:], hist = False, kde = True,
+	                 kde_kws = {'linewidth': 3}, label=config.model_types[i])
+
+	b.set_title('Entropy on Test Set',  fontsize=26)
+	b.set_ylabel('Density', fontsize=26)
+
+	os.makedirs(os.path.join(config.model_dir, 'plots'), exist_ok=True)
+
+	b.legend(loc='upper right', fontsize=14)
+	plt.tight_layout(pad=0)
+	plt.savefig(os.path.join(config.model_dir, 'plots/fold_{}.png'.format(fold)), dpi=300)
+	plt.clf()
+	plt.close()
+
+
 
