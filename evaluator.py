@@ -151,7 +151,7 @@ def evaluate(data, test_data, config):
 			val_accuracies.append(val_accuracy)
 			test_accuracies.append(test_accuracy)
 
-			if config.uncertainty and config.voting_type=='uncertainty_voting':
+			if config.uncertainty:
 				average_uncertainties.append(average_results[0])
 				average_entropies.append(average_results[1])
 
@@ -234,7 +234,7 @@ def evaluate(data, test_data, config):
 		print('Test mean: {:.3f}'.format(np.mean(test_accuracies)))
 		print('Test std: {:.3f}'.format(np.std(test_accuracies)))
 
-	if config.uncertainty and config.voting_type=='uncertainty_voting':
+	if config.uncertainty:
 		print('Test Average Uncertainties: ', list(np.mean(average_uncertainties, axis=0)))
 		print('Test Average Entropies: ', list(np.mean(average_entropies, axis=0)))
 
@@ -290,15 +290,28 @@ def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, lear
 
 		if config.voting_type == 'hard_voting':
 			preds = []
+			pred_stds = []
+			pred_entropies = []
 
 			for model, feature in zip(models, features):
 				if config.uncertainty:
-					probs = model(feature).mean().numpy()
+					predictions = model(feature)
+					probs = predictions.mean().numpy()
+					probs_std = predictions.stddev().numpy()
+					probs_entropy = predictions.entropy().numpy()
+
+					pred_stds.append(probs_std)
+					pred_entropies.append(probs_entropy)
+
 				else:
 					probs = model.predict(feature)
 				preds.append(probs)
+
 			preds = np.stack(preds, axis=1) # 86,3,1
 			voted_predictions = np.mean(preds, axis=1)
+
+			pred_stds = np.stack(pred_stds, axis=1) # N,3,1
+			pred_entropies = np.stack(pred_entropies, axis=1) # N,3,1
 
 		elif config.voting_type == 'uncertainty_voting':
 			pred_means = []
@@ -325,6 +338,7 @@ def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, lear
 			voting_weights = std_inverse / std_sums
 			voted_predictions = np.sum(pred_means * voting_weights, axis=1)
 
+		if config.uncertainty:
 			average_uncertainties = np.squeeze(np.mean(pred_stds, axis=0))
 			average_entropies = np.squeeze(np.mean(pred_entropies, axis=0))
 			print('Average Uncertainties ', average_uncertainties)
@@ -333,7 +347,7 @@ def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, lear
 		score = mean_squared_error(np.expand_dims(y, axis=-1), voted_predictions, squared=False)
 		print('rmse: {:.3f}'.format(score))
 
-		if config.task == 'regression' and config.voting_type == 'uncertainty_voting':
+		if config.task == 'regression' and config.uncertainty:
 			return score, None, [average_uncertainties, average_entropies]
 		return score, None, None
 
