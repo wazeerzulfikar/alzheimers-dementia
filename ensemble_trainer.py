@@ -64,8 +64,10 @@ def boosted_train_a_fold(
 
 	x_train, x_val = X2[train_index], X2[val_index]
 	y_train, y_val = y[train_index], y[val_index]
+	booster_losses = np.array(booster_losses)[train_index]
 
-	results = trainer.train_a_fold(boosted_model_type, x_train, y_train, x_val, y_val, fold, config)
+	results = trainer.train_a_fold(boosted_model_type, x_train, y_train, x_val, y_val, fold, 
+		sample_weight=booster_losses, config=config)
 
 	return results
 

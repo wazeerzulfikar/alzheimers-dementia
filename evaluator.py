@@ -64,7 +64,7 @@ def evaluate(data, test_data, config):
 
 		numpy_seeds = [913293, 653261, 84754, 645, 13451235]
 
-		for i in range(len(numpy_seeds)):
+		for i in range(config.n_folds):
 			np.random.seed(numpy_seeds[i])
 
 			p = np.random.permutation(len(y))

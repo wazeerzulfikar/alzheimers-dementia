@@ -10,7 +10,10 @@ config = utils.EasyDict({
 	'dataset_dir': '../../alzheimers/ADReSS-IS2020-data/train',
 	'test_dataset_dir': '../../alzheimers/ADReSS-IS2020-data/test',
 
-	'model_dir': 'models/uncertainty_boost/test',
+	# 'model_dir': 'models/uncertainty_individual/1',
+	# 'model_types': ['intervention'],
+
+	'model_dir': 'models/uncertainty_boosting/1',
 	'model_types': ['intervention', 'compare', 'pause'],
 
 	# 'training_type': 'bagging',

@@ -51,7 +51,7 @@ def train_n_folds(model_type, data, config):
 	else:
 		numpy_seeds = [913293, 653261, 84754, 645, 13451235]
 
-		for i in range(len(numpy_seeds)):
+		for i in range(config.n_folds):
 			fold+=1
 			np.random.seed(numpy_seeds[i])
 
@@ -71,7 +71,7 @@ def train_n_folds(model_type, data, config):
 
 	return train_accuracies, val_accuracies
 
-def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
+def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config, sample_weight=None):
 
 	print('Training fold {} of {}'.format(fold, model_type))
 
@@ -116,23 +116,24 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
 			def negloglik(y, p_y):
 				return -p_y.log_prob(y)
 			model.compile(loss=negloglik, 
-				optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon))
+				optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon), metrics=['mse'])
 			save_weights_only = False
 
 		else:
 			model.compile(loss=tf.keras.losses.mean_squared_error, 
-				optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon))
+				optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon), metrics=['mse'])
 
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_loss', verbose=0, save_best_only=True,
+			os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_mse', verbose=0, save_best_only=True,
 			save_weights_only=save_weights_only, mode='auto', save_freq='epoch')
 
-	model.fit(x_train, y_train,
+	hist = model.fit(x_train, y_train,
 			  batch_size=config.batch_size,
 			  epochs=config.n_epochs,
 			  verbose=config.verbose,
 			  callbacks=[checkpointer],
-			  validation_data=(x_val, y_val))
+			  validation_data=(x_val, y_val),
+			  sample_weight=sample_weight)
 
 
 	if config.uncertainty:
@@ -158,6 +159,12 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config):
 		if config.task == 'classification':
 			val_score = val_score[1]
 
+	epoch_val_losses = hist.history['val_loss']
+	best_epoch_val_loss, best_epoch = np.min(epoch_val_losses), np.argmin(epoch_val_losses)+1
+	best_epoch_train_loss = hist.history['loss'][best_epoch-1]
+
+	print('Best Epoch: {:d}'.format(best_epoch))
+	print('Best Val loss {:.3f}'.format(best_epoch_val_loss))
 	print('Fold Val accuracy:', val_score)
 
 	return train_score, val_score
