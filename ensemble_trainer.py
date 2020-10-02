@@ -53,7 +53,10 @@ def boosted_train_a_fold(
 	booster_losses = []
 	for idx, x in enumerate(X1):
 		if config.uncertainty:
-			loss = booster_model(np.expand_dims(x, axis=0)).stddev().numpy()[0][0]
+			if config.boosting_type=='stddev':
+				loss = booster_model(np.expand_dims(x, axis=0)).stddev().numpy()[0][0]
+			elif config.boosting_type=='rmse':
+				loss = np.abs(y[idx] - booster_model(np.expand_dims(x, axis=0)).mean().numpy()[0][0])
 		else:
 			loss = booster_model.evaluate(np.expand_dims(x, axis=0), np.expand_dims(y[idx], axis=0), verbose=0)
 		booster_losses.append(loss)

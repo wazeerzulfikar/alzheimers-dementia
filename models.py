@@ -19,6 +19,7 @@ def create_intervention_model(task, longest_speaker_length, uncertainty):
 	elif task == 'regression':
 		if uncertainty:
 			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dropout(0.2))
 			model.add(layers.Dense(2))
 			model.add(tfp.layers.DistributionLambda(
 				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))
@@ -53,6 +54,7 @@ def create_pause_model(task, n_features, uncertainty):
 	elif task == 'regression':
 		if uncertainty:
 			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dropout(0.2))
 			model.add(layers.Dense(2))
 			model.add(tfp.layers.DistributionLambda(
 				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))
@@ -78,6 +80,7 @@ def create_compare_model(task, features_size, uncertainty):
 	elif task == 'regression':
 		if uncertainty:
 			model.add(layers.Dense(16, activation='relu'))
+			model.add(layers.Dropout(0.2))
 			model.add(layers.Dense(2))
 			model.add(tfp.layers.DistributionLambda(
 				lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6)))

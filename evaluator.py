@@ -60,6 +60,9 @@ def evaluate(data, test_data, config):
 	val_accuracies = []
 	test_accuracies = []
 
+	average_uncertainties = []
+	average_entropies = []
+
 	if dataset_split == 'full_dataset': # compare features need to be projected
 
 		numpy_seeds = [913293, 653261, 84754, 645, 13451235]
@@ -121,7 +124,7 @@ def evaluate(data, test_data, config):
 
 				print('Fold {}'.format(fold+1))
 				print('Train')
-				train_accuracy, learnt_voter = get_ensemble_accuracy(task, models, features, y_train, voting_type)
+				train_accuracy, learnt_voter, _ = get_ensemble_accuracy(task, models, features, y_train, config)
 
 				print('Val')
 				features = []
@@ -130,7 +133,7 @@ def evaluate(data, test_data, config):
 						features.append(compare_val)
 					else:	
 						features.append(data[m][n_train:])
-				val_accuracy, _ = get_ensemble_accuracy(task, models, features, y_val, voting_type, learnt_voter=learnt_voter,  fold=fold)
+				val_accuracy, _, _ = get_ensemble_accuracy(task, models, features, y_val, config, learnt_voter=learnt_voter,  fold=fold)
 
 
 				print('Test')
@@ -140,13 +143,17 @@ def evaluate(data, test_data, config):
 						features.append(compare_test)
 					else:	
 						features.append(test_data[m])
-				test_accuracy, _ = get_ensemble_accuracy(task, models, features, y_test, voting_type, learnt_voter=learnt_voter,  fold=fold)
+				test_accuracy, _, average_results = get_ensemble_accuracy(task, models, features, y_test, config, learnt_voter=learnt_voter,  fold=fold)
 
 				print('----'*10)
 
 			train_accuracies.append(train_accuracy)
 			val_accuracies.append(val_accuracy)
 			test_accuracies.append(test_accuracy)
+
+			if config.uncertainty:
+				average_uncertainties.append(average_results[0])
+				average_entropies.append(average_results[1])
 
 			fold+=1
 
@@ -199,7 +206,7 @@ def evaluate(data, test_data, config):
 
 				print('Fold {}'.format(fold+1))
 				print('Train')
-				train_accuracy, learnt_voter = get_ensemble_accuracy(task, models, features, y_train, voting_type)
+				train_accuracy, learnt_voter = get_ensemble_accuracy(task, models, features, y_train, config)
 
 				print('Val')
 				features = []
@@ -208,7 +215,7 @@ def evaluate(data, test_data, config):
 						features.append(compare_val)
 					else:	
 						features.append(data[m][val_index])
-				val_accuracy, _ = get_ensemble_accuracy(task, models, features, y_val, voting_type, learnt_voter=learnt_voter,  fold=fold)
+				val_accuracy, _ = get_ensemble_accuracy(task, models, features, y_val, config, learnt_voter=learnt_voter,  fold=fold)
 
 				print('----'*10)
 
@@ -226,6 +233,10 @@ def evaluate(data, test_data, config):
 	if len(test_accuracies) > 0:
 		print('Test mean: {:.3f}'.format(np.mean(test_accuracies)))
 		print('Test std: {:.3f}'.format(np.std(test_accuracies)))
+
+	if config.uncertainty:
+		print('Test Average Uncertainties: ', list(np.mean(average_uncertainties, axis=0)))
+		print('Test Average Entropies: ', list(np.mean(average_entropies, axis=0)))
 
 
 def get_individual_accuracy(task, model, feature, y, fold=None):
@@ -246,7 +257,7 @@ def get_individual_accuracy(task, model, feature, y, fold=None):
 		score = mean_squared_error(np.expand_dims(y, axis=-1), preds, squared=False)
 		return score
 
-def get_ensemble_accuracy(task, models, features, y, voting_type, num_classes=2, learnt_voter=None, fold=None):
+def get_ensemble_accuracy(task, models, features, y, config, num_classes=2, learnt_voter=None, fold=None):
 	
 	if task == 'classification':
 		probs = []
@@ -255,14 +266,14 @@ def get_ensemble_accuracy(task, models, features, y, voting_type, num_classes=2,
 			probs.append(pred)
 		probs = np.stack(probs, axis=1)
 
-		if voting_type=='hard_voting':
+		if config.voting_type=='hard_voting':
 			model_predictions = np.argmax(probs, axis=-1)
 			model_predictions = np.squeeze(model_predictions)
 			voted_predictions = [max(set(i), key = list(i).count) for i in model_predictions]
-		elif voting_type=='soft_voting':
+		elif config.voting_type=='soft_voting':
 			model_predictions = np.sum(probs, axis=1)
 			voted_predictions = np.argmax(model_predictions, axis=-1)
-		elif voting_type=='learnt_voting':
+		elif config.voting_type=='learnt_voting':
 			model_predictions = np.reshape(probs, (len(y), -1))
 			if learnt_voter is None:
 				learnt_voter = LogisticRegression(C=0.1).fit(model_predictions, np.argmax(y, axis=-1))
@@ -273,20 +284,56 @@ def get_ensemble_accuracy(task, models, features, y, voting_type, num_classes=2,
 		report = precision_recall_fscore_support(np.argmax(y, axis=-1), voted_predictions, average='binary')
 		print('precision: {:.3f}, recall: {:.3f}, f1_score: {:.3f}, accuracy: {:.3f}'.format(report[0], report[1], report[2], accuracy))
 
-		return accuracy, learnt_voter
+		return accuracy, learnt_voter, None
 
 	elif task == 'regression':
-		preds = []
 
-		for model, feature in zip(models, features):
-			probs = model.predict(feature)
+		if config.voting_type == 'hard_voting':
+			preds = []
 
-			preds.append(probs)
-		preds = np.stack(preds, axis=1) # 86,3,1
-		voted_predictions = np.mean(preds, axis=1)
+			for model, feature in zip(models, features):
+				if config.uncertainty:
+					probs = model(feature).mean().numpy()
+				else:
+					probs = model.predict(feature)
+				preds.append(probs)
+			preds = np.stack(preds, axis=1) # 86,3,1
+			voted_predictions = np.mean(preds, axis=1)
+
+		elif config.voting_type == 'uncertainty_voting':
+			pred_means = []
+			pred_stds = []
+			pred_entropies = []
+
+			for model, feature in zip(models, features):
+				probs = model(feature)
+				probs_mean = probs.mean().numpy()
+				probs_std = probs.stddev().numpy()
+				probs_entropy = probs.entropy().numpy()
+
+				pred_means.append(probs_mean)
+				pred_stds.append(probs_std)
+				pred_entropies.append(probs_entropy)
+
+			pred_means = np.stack(pred_means, axis=1) # N,3,1
+			pred_stds = np.stack(pred_stds, axis=1) # N,3,1
+			pred_entropies = np.stack(pred_entropies, axis=1) # N,3,1
+
+			std_inverse = np.reciprocal(pred_stds)
+			std_sums = np.sum(std_inverse, axis=1, keepdims=True)
+
+			voting_weights = std_inverse / std_sums
+			voted_predictions = np.sum(pred_means * voting_weights, axis=1)
+
+			average_uncertainties = np.squeeze(np.mean(pred_stds, axis=0))
+			average_entropies = np.squeeze(np.mean(pred_entropies, axis=0))
+			print('Average Uncertainties ', average_uncertainties)
+			print('Average Entropies ', average_entropies)
 
 		score = mean_squared_error(np.expand_dims(y, axis=-1), voted_predictions, squared=False)
 		print('rmse: {:.3f}'.format(score))
 
-		return score, None
+		if config.task == 'regression' and config.voting_type == 'uncertainty_voting':
+			return score, None, [average_uncertainties, average_entropies]
+		return score, None, None
 

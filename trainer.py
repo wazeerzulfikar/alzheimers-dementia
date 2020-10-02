@@ -78,14 +78,20 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config, sampl
 	if model_type == 'pause':
 		model = models.create_pause_model(config.task, config.n_pause_features, config.uncertainty)
 		epsilon = 1e-07
+		config.lr = 0.00125
+		config.batch_size = 24
 
 	elif model_type == 'intervention':
 		model = models.create_intervention_model(config.task, config.longest_speaker_length, config.uncertainty)
 		epsilon = 1e-07
+		config.lr = 0.00125
+		config.batch_size = 24
 
 	elif model_type == 'compare':
 		model = models.create_compare_model(config.task, config.compare_features_size, config.uncertainty)
 		epsilon = 1e-07
+		config.lr = 0.01
+		config.batch_size = 16
 
 		sc = StandardScaler()
 		sc.fit(x_train)
