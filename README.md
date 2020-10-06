@@ -1,10 +1,12 @@
 # Multi-Modal Inductive Transfer Learning and Uncertainty-Aware Multi-Modal Ensembling for Detection of Alzheimer’s Dementia and its Severity
 
 > [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://arxiv.org/abs/2009.00700)
+
 > Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Nouran Soliman, Pattie Maes  
 > To appear in INTERSPEECH 2020 
 
 > [Uncertainty-Aware Multi-Modal Ensembling for Severity Prediction of Alzheimer's Dementia](https://arxiv.org/abs/2010.01440)
+
 > Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Rishab Khincha, Pattie Maes 
 
 This work was also submitted to the [Alzheimer's Dementia Recognition through Spontaneous Speech (ADReSS) challenge](http://www.homepages.ed.ac.uk/sluzfil/ADReSS/)
