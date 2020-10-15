@@ -108,16 +108,22 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config, sampl
 		dump(sc, open(os.path.join(config.model_dir, 'compare/scaler_{}.pkl'.format(fold)), 'wb'))
 		dump(pca, open(os.path.join(config.model_dir, 'compare/pca_{}.pkl'.format(fold)), 'wb'))
 
+	elif model_type == 'silences':
+		model = models.create_silences_model(config.task, config.uncertainty)
+		epsilon = 1e-07
+
 	save_weights_only = False
 
 	if config.task == 'classification':
 
+		best_model = 'val_loss'
 		model.compile(loss= tf.keras.losses.categorical_crossentropy,
 				  optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon),
 				  metrics=['categorical_accuracy'])
 
 	elif config.task == 'regression':
 
+		best_model = 'val_loss'
 		if config.uncertainty:
 			def negloglik(y, p_y):
 				return -p_y.log_prob(y)
@@ -130,7 +136,7 @@ def train_a_fold(model_type, x_train, y_train, x_val, y_val, fold, config, sampl
 				optimizer=tf.keras.optimizers.Adam(lr=config.lr, epsilon=epsilon), metrics=['mse'])
 
 	checkpointer = tf.keras.callbacks.ModelCheckpoint(
-			os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor='val_mse', verbose=0, save_best_only=True,
+			os.path.join(config.model_dir, model_type, 'fold_{}.h5'.format(fold)), monitor=best_model, verbose=0, save_best_only=True,
 			save_weights_only=save_weights_only, mode='auto', save_freq='epoch')
 
 	hist = model.fit(x_train, y_train,

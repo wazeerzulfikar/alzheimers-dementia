@@ -134,3 +134,47 @@ def create_spectogram_model(spectogram_size):
 	model = Model(model2_input, model2_output)
 
 	return model
+
+def create_silences_model(task, uncertainty):
+	model2_input = layers.Input(shape=(800, 1),  name='silences_input')
+
+	model2_hidden1 = layers.Conv1D(16, kernel_size=3, strides=1,
+						 activation='relu')(model2_input)
+	model2_BN1 = layers.BatchNormalization()(model2_hidden1)
+	model2_hidden2 = layers.MaxPool1D()(model2_BN1)
+	
+	model2_hidden3 = layers.Conv1D(32, kernel_size=3, strides=1,
+						 activation='relu')(model2_hidden2)
+	model2_BN2 = layers.BatchNormalization()(model2_hidden3)
+	model2_hidden4 = layers.MaxPool1D()(model2_BN2)
+
+	model2_hidden5 = layers.Conv1D(64, kernel_size=5, strides=1,
+						 activation='relu')(model2_hidden4)
+	model2_BN3 = layers.BatchNormalization()(model2_hidden5)
+	model2_hidden6 = layers.MaxPool1D()(model2_BN3)
+
+	model2_hidden7 = layers.Conv1D(128, kernel_size=5, strides=1,
+						 activation='relu')(model2_hidden6)
+	model2_BN4 = layers.BatchNormalization()(model2_hidden7)
+	model2_hidden8 = layers.MaxPool1D()(model2_BN4)
+
+	model2_hidden9 = layers.Flatten()(model2_hidden8)
+	model2_hidden10 = layers.BatchNormalization()(model2_hidden9)
+	model2_hidden11 = layers.Dense(128, activation='relu')(model2_hidden10)
+	model2_output = layers.Dropout(0.2)(model2_hidden11)
+	if task=='classification':
+		model2_output = layers.Dense(2, activation='softmax')(model2_output)
+	elif task=='regression':
+		if uncertainty:
+			model2_output = layers.Dense(2)(model2_output)
+			model2_output = layers.ReLU(max_value=30)(model2_output)
+			model2_output = tfp.layers.DistributionLambda(
+					lambda t: tfd.Normal(loc=t[..., :1], scale=tf.math.softplus(t[...,1:])+1e-6))(model2_output)
+
+		else:	
+			model2_output = layers.Dense(1, kernel_regularizer=tf.keras.regularizers.l2(0.01), activity_regularizer=tf.keras.regularizers.l1(0.01))(model2_output)
+			model2_output = layers.ReLU(max_value=30)(model2_output)
+
+	model = Model(model2_input, model2_output)
+
+	return model

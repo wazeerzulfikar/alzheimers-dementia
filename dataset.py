@@ -232,6 +232,178 @@ def prepare_data(dataset_dir, config):
 		'subjects': subjects
 	}
 
+import collections
+import contextlib
+import sys
+import wave
+
+import webrtcvad
+import audioop
+
+def read_wave(path):
+	"""Reads a .wav file.
+	Takes the path, and returns (PCM audio data, sample rate).
+	"""
+	with contextlib.closing(wave.open(path, 'rb')) as wf:
+		num_channels = wf.getnchannels()
+		assert num_channels == 1
+		sample_width = wf.getsampwidth()
+		assert sample_width == 2
+		sample_rate = wf.getframerate()
+
+		n_frames = wf.getnframes()
+		data = wf.readframes(n_frames)
+
+		converted = audioop.ratecv(data, sample_width, num_channels, sample_rate, 32000, None)
+		return converted[0], 32000
+
+class Frame(object):
+	"""Represents a "frame" of audio data."""
+	def __init__(self, bytes, timestamp, duration):
+		self.bytes = bytes
+		self.timestamp = timestamp
+		self.duration = duration
+
+
+def frame_generator(frame_duration_ms, audio, sample_rate):
+	"""Generates audio frames from PCM audio data.
+	Takes the desired frame duration in milliseconds, the PCM data, and
+	the sample rate.
+	Yields Frames of the requested duration.
+	"""
+	n = int(sample_rate * (frame_duration_ms / 1000.0) * 2)
+	offset = 0
+	timestamp = 0.0
+	duration = (float(n) / sample_rate) / 2.0
+	while offset + n < len(audio):
+		yield Frame(audio[offset:offset + n], timestamp, duration)
+		timestamp += duration
+		offset += n
+
+
+def vad_collector(sample_rate, frame_duration_ms,
+                  padding_duration_ms, vad, frames):
+	"""Filters out non-voiced audio frames.
+	Given a webrtcvad.Vad and a source of audio frames, yields only
+	the voiced audio.
+	Uses a padded, sliding window algorithm over the audio frames.
+	When more than 90% of the frames in the window are voiced (as
+	reported by the VAD), the collector triggers and begins yielding
+	audio frames. Then the collector waits until 90% of the frames in
+	the window are unvoiced to detrigger.
+	The window is padded at the front and back to provide a small
+	amount of silence or the beginnings/endings of speech around the
+	voiced frames.
+	Arguments:
+	sample_rate - The audio sample rate, in Hz.
+	frame_duration_ms - The frame duration in milliseconds.
+	padding_duration_ms - The amount to pad the window, in milliseconds.
+	vad - An instance of webrtcvad.Vad.
+	frames - a source of audio frames (sequence or generator).
+	Returns: A generator that yields PCM audio data.
+	"""
+	num_padding_frames = int(padding_duration_ms / frame_duration_ms)
+	# We use a deque for our sliding window/ring buffer.
+	ring_buffer = collections.deque(maxlen=num_padding_frames)
+	# We have two states: TRIGGERED and NOTTRIGGERED. We start in the
+	# NOTTRIGGERED state.
+	triggered = False
+
+	voiced_frames = []
+	silenced_frames = []
+	for frame in frames:
+		is_speech = vad.is_speech(frame.bytes, sample_rate)
+		if is_speech:
+		    silenced_frames.append(5)
+		else:
+			silenced_frames.append(10)
+    		        
+	return silenced_frames
+
+
+def get_pause_masks(file):
+	frame_duration_ms = 30
+
+	audio, sample_rate = read_wave(file)
+	vad = webrtcvad.Vad()
+	frames = frame_generator(frame_duration_ms, audio, sample_rate)
+	frames = list(frames)
+	segments = vad_collector(sample_rate, frame_duration_ms, 10, vad, frames)
+	
+	segments = np.asarray(segments)
+	segments = (segments - np.mean(segments))/np.std(segments) 
+	return segments
+
+def prepare_data_new(dataset_dir, config):
+	'''
+	Prepare all data
+	'''
+	################################## SUBJECTS ################################
+	subject_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')) + glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
+	subjects = np.array(sorted(list(set([i.split('/')[-1][:-4] for i in subject_files]))))
+
+	######################################################################
+
+	################################## SILENCE MASK ####################################
+
+	if 'ADReSS' in dataset_dir:
+		cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.wav')))
+	else:
+		cc_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cc/*.mp3')))
+
+	# can tweak this parameter for clipping the len of the mask
+	max_len = 800
+
+	all_counts_cc = []
+	for a_f in cc_audio_files:
+		pause_features = get_pause_masks(a_f)
+		all_counts_cc.append(pause_features[:max_len])
+
+	if dataset_dir == '../DementiaBank':
+		cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.mp3')))
+	else:
+		cd_audio_files = sorted(glob.glob(os.path.join(dataset_dir, 'Full_wave_enhanced_audio/cd/*.wav')))
+
+	all_counts_cd = [] 
+	for a_f in cd_audio_files:
+		pause_features = get_pause_masks(a_f)
+		all_counts_cd.append(pause_features[:max_len])
+
+	all_counts_cd = np.asarray(all_counts_cd)
+	all_counts_cc = np.asarray(all_counts_cc)
+	# print("all_counts_cc : ", all_counts_cc.shape)
+	# print("all_counts_cd : ", all_counts_cd.shape)
+
+	X_pause = np.concatenate((all_counts_cc, all_counts_cd), axis=0).astype(np.float32)
+
+	y_reg_cc = utils.get_regression_values(os.path.join(dataset_dir, 'cc_meta_data.txt'))
+	y_reg_cd = utils.get_regression_values(os.path.join(dataset_dir, 'cd_meta_data.txt'))
+
+	y_reg_pause = np.concatenate((y_reg_cc, y_reg_cd), axis=0).astype(np.float32)
+
+	X_reg_pause = np.copy(X_pause)
+
+	y_cc = np.zeros((len(all_counts_cc), 2))
+	y_cc[:,0] = 1
+
+	y_cd = np.zeros((len(all_counts_cd), 2))
+	y_cd[:,1] = 1
+
+	y_pause = np.concatenate((y_cc, y_cd), axis=0).astype(np.float32)
+	
+	print(X_pause.shape, y_pause.shape, y_reg_pause.shape)
+
+
+	################################## SILENCE MASK ####################################
+	return {
+		# 'intervention': X_intervention,
+		'silences': X_pause,
+		# 'compare': X_compare,
+		'y_clf': y_pause,
+		'y_reg': y_reg_pause,
+		'subjects': subjects
+	}
+
 
 def prepare_test_data(dataset_dir, config):
 
