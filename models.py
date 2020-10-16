@@ -137,9 +137,10 @@ def create_spectogram_model(spectogram_size):
 
 def create_silences_model(task, uncertainty):
 	model2_input = layers.Input(shape=(800, 1),  name='silences_input')
+	model2_input_BN = layers.BatchNormalization()(model2_input)
 
 	model2_hidden1 = layers.Conv1D(16, kernel_size=3, strides=1,
-						 activation='relu')(model2_input)
+						 activation='relu')(model2_input_BN)
 	model2_BN1 = layers.BatchNormalization()(model2_hidden1)
 	model2_hidden2 = layers.MaxPool1D()(model2_BN1)
 	

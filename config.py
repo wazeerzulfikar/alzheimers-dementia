@@ -1,10 +1,10 @@
 import utils
 
 config = utils.EasyDict({
-	# 'task': 'classification',
-	'task': 'regression',
+	'task': 'classification',
+	# 'task': 'regression',
 
-	'uncertainty': True,
+	'uncertainty': False,
 
 	# 'dataset_dir': '../DementiaBank'
 	'dataset_dir': '../DementiaBank/0extra/ADReSS-IS2020-train/ADReSS-IS2020-data/train/',
@@ -14,7 +14,7 @@ config = utils.EasyDict({
 	# 'model_types': ['compare'],
 
 	# 'model_dir': 'models/uncertainty_boosting_rmse/1',
-	'model_dir': 'models/testing_silence/2_r',
+	'model_dir': 'models/testing_silence/3_c',
 
 	# 'model_types': [ 'compare', 'pause', 'intervention'],
 	'model_types': [ 'silences'],
@@ -43,8 +43,8 @@ config = utils.EasyDict({
 	'compare_features_size': 21,
 	'split_reference': 'samples',
 
-	'n_epochs': 5,
+	'n_epochs': 2000,
 	'batch_size': 24,
-	'lr': 0.0125,
+	'lr': 0.001,
 	'verbose': 0
 })

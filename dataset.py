@@ -331,7 +331,8 @@ def get_pause_masks(file):
 	segments = vad_collector(sample_rate, frame_duration_ms, 10, vad, frames)
 	
 	segments = np.asarray(segments)
-	segments = (segments - np.mean(segments))/np.std(segments) 
+	# segments = (segments - np.mean(segments))/np.std(segments) 
+	# print(segments)
 	return segments
 
 def prepare_data_new(dataset_dir, config):
