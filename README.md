@@ -1,8 +1,13 @@
-# Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity
+# Multi-Modal Inductive Transfer Learning and Uncertainty-Aware Multi-Modal Ensembling for Detection of Alzheimer’s Dementia and its Severity
 
 > [Multimodal Inductive Transfer Learning for Detection of Alzheimer’s Dementia and its Severity](https://arxiv.org/abs/2009.00700)
+
 > Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Nouran Soliman, Pattie Maes  
-> To appear in INTERSPEECH 2020  
+> To appear in INTERSPEECH 2020 
+
+> [Uncertainty-Aware Multi-Modal Ensembling for Severity Prediction of Alzheimer's Dementia](https://arxiv.org/abs/2010.01440)
+
+> Utkarsh Sarawgi\*, Wazeer Zulfikar\*, Rishab Khincha, Pattie Maes 
 
 This work was also submitted to the [Alzheimer's Dementia Recognition through Spontaneous Speech (ADReSS) challenge](http://www.homepages.ed.ac.uk/sluzfil/ADReSS/)
 
@@ -83,11 +88,20 @@ This code is released under the MIT License (refer to the [LICENSE](https://gith
 
 ## Citation
 
-If you find this project useful for your research, please use the following BibTeX entry.
+If you find this project useful for your research, please use the following BibTeX entries.
 
     @article{sarawgi2020multimodal,
       title={Multimodal Inductive Transfer Learning for Detection of Alzheimer's Dementia and its Severity},
       author={Sarawgi, Utkarsh and Zulfikar, Wazeer and Soliman, Nouran and Maes, Pattie},
       journal={arXiv preprint arXiv:2009.00700},
       year={2020}
+    }
+    
+    @misc{sarawgi2020uncertaintyaware,
+      title={Uncertainty-Aware Multi-Modal Ensembling for Severity Prediction of Alzheimer's Dementia}, 
+      author={Utkarsh Sarawgi and Wazeer Zulfikar and Rishab Khincha and Pattie Maes},
+      year={2020},
+      eprint={2010.01440},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
     }
